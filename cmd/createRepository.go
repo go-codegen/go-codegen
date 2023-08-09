@@ -5,6 +5,9 @@ package cmd
 
 import (
 	"fmt"
+	repository_module "github.com/go-codegen/go-codegen/internal/modules/repository"
+	"github.com/go-codegen/go-codegen/internal/parse"
+	"github.com/go-codegen/go-codegen/internal/repository"
 	"github.com/spf13/cobra"
 )
 
@@ -40,6 +43,18 @@ to quickly create a Cobra application.`,
 
 		fmt.Println("path: ", path)
 		fmt.Println("outPath: ", outPath)
+
+		module := repository_module.NewGorm()
+
+		repo, err := parse.NewParse(path, "")
+
+		if err != nil {
+			fmt.Println("Ошибка:", err)
+			return
+		}
+
+		body := repository.NewRepository(module, repo)
+		body.Create(outPath)
 	},
 }
 
