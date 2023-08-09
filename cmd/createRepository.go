@@ -5,7 +5,6 @@ package cmd
 
 import (
 	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -15,21 +14,39 @@ var createRepositoryCmd = &cobra.Command{
 	Short: "A brief description of your command",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
-
+ 
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("createRepository called")
+		utils := NewUtils()
+
+		globalPath, err := cmd.Flags().GetString("path")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		path, err := utils.GetPath(cmd)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		outPath, err := utils.GetOutPath(cmd)
+		if err != nil {
+			outPath = globalPath
+		}
+
+		fmt.Println("path: ", path)
+		fmt.Println("outPath: ", outPath)
 	},
 }
 
-var Path string
-var OutPath string
-
 func init() {
-	createRepositoryCmd.Flags().StringVarP(&Path, "path", "p", "", "Path to the entity")
-	createRepositoryCmd.Flags().StringVarP(&OutPath, "out", "o", "", "Path to the output directory")
+
+	createRepositoryCmd.Flags().StringP("path", "p", "", "Path to the entity")
+	createRepositoryCmd.Flags().StringP("out", "o", "", "Path to the output directory")
 	rootCmd.AddCommand(createRepositoryCmd)
 
 	// Here you will define your flags and configuration settings.

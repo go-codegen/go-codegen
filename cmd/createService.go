@@ -25,8 +25,8 @@ to quickly create a Cobra application.`,
 }
 
 func init() {
-	createRepositoryCmd.Flags().StringVarP(&Path, "path", "p", "", "Path to the entity")
-	createRepositoryCmd.Flags().StringVarP(&OutPath, "out", "o", "", "Path to the output directory")
+	//createRepositoryCmd.Flags().StringVarP(&Path, "path", "p", "", "Path to the entity")
+	//createRepositoryCmd.Flags().StringVarP(&OutPath, "out", "o", "", "Path to the output directory")
 
 	rootCmd.AddCommand(createServiceCmd)
 
