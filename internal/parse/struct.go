@@ -45,24 +45,41 @@ func (p *Struct) parseStructs(prefix string) error {
 		return err
 	}
 
+	// Get all structs
 	for _, decl := range node.Decls {
-		if genDecl, ok := decl.(*ast.GenDecl); ok {
-			for _, spec := range genDecl.Specs {
-				if typeSpec, ok := spec.(*ast.TypeSpec); ok {
-					structName := typeSpec.Name.Name
-					if strings.HasPrefix(structName, prefix) {
-						fields, fieldErr := p.getFields(typeSpec.Type)
-						if fieldErr != nil {
-							return fieldErr
-						}
-						p.Structs = append(p.Structs, StructInfo{
-							Name:        strings.TrimPrefix(structName, prefix),
-							Fields:      fields,
-							PackageName: node.Name.Name,
-						})
-					}
-				}
+		// Get all gen declarations
+		genDecl, ok := decl.(*ast.GenDecl)
+		if !ok {
+			continue
+		}
+
+		// Get all type specs
+		for _, spec := range genDecl.Specs {
+			// If not type spec, continue
+			typeSpec, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
 			}
+
+			structName := typeSpec.Name.Name
+
+			// If it does not have prefix, continue
+			if !strings.HasPrefix(structName, prefix) {
+				continue
+			}
+
+			// Find all fields
+			fields, fieldErr := p.getFields(typeSpec.Type)
+			if fieldErr != nil {
+				return fieldErr
+			}
+
+			// Append struct
+			p.Structs = append(p.Structs, StructInfo{
+				Name:        strings.TrimPrefix(structName, prefix),
+				Fields:      fields,
+				PackageName: node.Name.Name,
+			})
 		}
 	}
 	return nil
