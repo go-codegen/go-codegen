@@ -8,9 +8,10 @@ import (
 )
 
 type Methods struct {
-	Imports []string
-	Struct  filesys_core.StructBody
-	Funcs   []filesys_core.FuncBody
+	Imports   []string
+	Struct    filesys_core.StructBody
+	Funcs     []filesys_core.FuncBody
+	Interface filesys_core.InterfaceBody
 }
 
 type Entity struct {
@@ -80,6 +81,8 @@ func (r *Repository) CreateRepositoryMethods(s parse.StructInfo) filesys_core.Fi
 	for _, f := range repositoryData.Funcs {
 		structBody.Funcs = append(structBody.Funcs, f)
 	}
+
+	structBody.Interfaces = append(structBody.Interfaces, repositoryData.Interface)
 
 	return structBody
 }
