@@ -20,9 +20,14 @@ go install github.com/go-codegen/go-codegen
 
 ## Usage
 
+[//]: # (TODO: add more examples)
+
+### Create a repository with gorm
 ````
 go-codegen createRepository gorm --path=test/repository-test.go --out=test/files/
 ````
+
+
 
 
 
