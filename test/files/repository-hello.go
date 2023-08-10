@@ -1,9 +1,6 @@
 package repository
 
-import (
-	"github.com/go-codegen/go-codegen/test"
-	"gorm.io/gorm"
-)
+import "gorm.io/gorm"
 
 type HelloRepository struct {
 	db *gorm.DB
@@ -33,7 +30,7 @@ func (r *HelloRepository) Update(h *test.Hello) (*test.Hello, error) {
 	return h, nil
 }
 func (r *HelloRepository) Delete(id string) error {
-	if err := r.db.Delete(&test.Hello{}, "id = ?", id).Error; err != nil {
+	if err := r.db.Delete(&test.Hello{},"id = ?", id).Error; err != nil {
 		return err
 	}
 

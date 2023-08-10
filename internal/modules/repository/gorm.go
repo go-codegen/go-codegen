@@ -1,25 +1,23 @@
 package repository_module
 
 import (
-	"fmt"
 	"github.com/go-codegen/go-codegen/internal/constants"
 	filesys_core "github.com/go-codegen/go-codegen/internal/filesys/core"
 	"github.com/go-codegen/go-codegen/internal/parse"
 	"github.com/go-codegen/go-codegen/internal/repository"
-	"regexp"
-
+	"github.com/go-codegen/go-codegen/internal/utils"
 	"strings"
 )
 
 type Gorm struct {
-	suffix       constants.Repo
+	suffix       string
 	structSymbol string
 }
 
 func NewGorm() *Gorm {
 	return &Gorm{
-		suffix:       constants.Suffix,
-		structSymbol: constants.StructSymbol,
+		suffix:       string(constants.Suffix),
+		structSymbol: string(constants.StructSymbol),
 	}
 }
 
@@ -89,36 +87,6 @@ func (g *Gorm) createRepositoryImports() []string {
 	return imports
 }
 
-func (g *Gorm) EntityData(info parse.StructInfo) repository.Entity {
-	var entity repository.Entity
-
-	entity.Imports = g.createEntityImports()
-
-	entity.Struct = g.createEntityStruct(info)
-
-	return entity
-}
-
-func (g *Gorm) createEntityImports() []string {
-	var imports []string
-
-	imports = append(imports, "gorm.io/gorm")
-
-	return imports
-}
-
-func (g *Gorm) createEntityStruct(s parse.StructInfo) filesys_core.StructBody {
-	var entity filesys_core.StructBody
-
-	entity.Name = s.Name
-	entity.Fields = append(entity.Fields, "gorm.Model")
-	for _, f := range s.Fields {
-		entity.Fields = append(entity.Fields, f.Name+" "+f.Type+f.Tag)
-	}
-
-	return entity
-}
-
 // delete func
 func (g *Gorm) delete(info parse.StructInfo) filesys_core.FuncBody {
 	var function filesys_core.FuncBody
@@ -185,10 +153,13 @@ func (g *Gorm) findByAllFields(info parse.StructInfo) []filesys_core.FuncBody {
 
 		unique := false
 		if f.Tags["gorm"] != nil {
-			//	find field with "unique" tag in []string
 			if len(f.Tags["gorm"]) > 0 {
-				unique = g.findTag("unique", f.Tags["gorm"])
-				fmt.Println(f.Tags["gorm"])
+				unique = utils.FindTag("unique", f.Tags["gorm"])
+			}
+		}
+		if f.Tags[string(constants.MainTag)] != nil {
+			if len(f.Tags[string(constants.MainTag)]) > 0 {
+				unique = utils.FindTag("unique", f.Tags[string(constants.MainTag)])
 			}
 		}
 
@@ -221,7 +192,7 @@ func (g *Gorm) findOne(f parse.FieldInfo, packageName, name string) filesys_core
 	function.ReturnValues = append(function.ReturnValues, "*"+entityName, "error")
 
 	//parse f.Name camel case to snake case
-	snakeCase := g.parseCamelCaseToSnakeCase(f.Name)
+	snakeCase := utils.ParseCamelCaseToSnakeCase(f.Name)
 
 	function.Body = "var " + variableName + " " + entityName + "\n\n" + "\tif err := r.db.Where(\"" + snakeCase + " = ?\", " + f.Name + ").First(&" + variableName + ").Error; err != nil {" + "\n" + "\t\t" + "return nil, err" + "\n" + "\t}" + "\n\n" + "\treturn &" + variableName + ", nil"
 
@@ -242,26 +213,9 @@ func (g *Gorm) findMany(f parse.FieldInfo, packageName, name string) filesys_cor
 	function.ReturnValues = append(function.ReturnValues, "[]*"+entityName, "error")
 
 	//parse f.Name camel case to snake case
-	snakeCase := g.parseCamelCaseToSnakeCase(f.Name)
+	snakeCase := utils.ParseCamelCaseToSnakeCase(f.Name)
 
 	function.Body = "var " + variableName + " []*" + entityName + "\n\n" + "\tif err := r.db.Where(\"" + snakeCase + " = ?\", " + f.Name + ").Find(&" + variableName + ").Error; err != nil {" + "\n" + "\t\t" + "return nil, err" + "\n" + "\t}" + "\n\n" + "\treturn " + variableName + ", nil"
 
 	return function
-}
-
-// parse camel case to snake case
-func (g *Gorm) parseCamelCaseToSnakeCase(camelString string) string {
-	re := regexp.MustCompile("(.)([A-Z][a-z]*)")
-	snakeString := re.ReplaceAllString(camelString, "${1}_${2}")
-	snakeString = strings.ToLower(snakeString)
-	return snakeString
-}
-
-func (g *Gorm) findTag(tag string, array []string) bool {
-	for _, v := range array {
-		if v == tag {
-			return true
-		}
-	}
-	return false
 }

@@ -34,14 +34,14 @@ func (r *RepositoryTestRepository) FindByHelloID(HelloID int) ([]*test.Repositor
 
 	return r1, nil
 }
-func (r *RepositoryTestRepository) FindByNameAction(NameAction string) (*test.RepositoryTest, error) {
-	var r1 test.RepositoryTest
+func (r *RepositoryTestRepository) FindByNameAction(NameAction string) ([]*test.RepositoryTest, error) {
+	var r1 []*test.RepositoryTest
 
-	if err := r.db.Where("name_action = ?", NameAction).First(&r1).Error; err != nil {
+	if err := r.db.Where("name_action = ?", NameAction).Find(&r1).Error; err != nil {
 		return nil, err
 	}
 
-	return &r1, nil
+	return r1, nil
 }
 func (r *RepositoryTestRepository) FindByAge(Age int) ([]*test.RepositoryTest, error) {
 	var r1 []*test.RepositoryTest
