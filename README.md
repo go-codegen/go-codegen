@@ -20,11 +20,37 @@ go install github.com/go-codegen/go-codegen
 
 [//]: # (TODO: add more examples)
 
+### Create a entity 
+````
+type Recipient struct {
+	gorm.Model
+}
+
+type User struct {
+	gorm.Model
+	NameAction string `gorm:"unique"`
+	Age        int    `codegen:"unique"`
+	RecipientID int
+	Recipient
+}
+````
+
+
+
 ### Create a repository with gorm
 ````
 go-codegen createRepository gorm --path=test/repository-test.go --out=test/files/
 ````
 
+ 
+
+[//]: # (List of available commands)
+
+
+ 
+## Tags
+
+* unique - when you create a repository methods, the field will be unique in method find
 
 
 
