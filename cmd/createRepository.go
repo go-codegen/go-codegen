@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/go-codegen/go-codegen/internal/colorPrint"
 	repository_module "github.com/go-codegen/go-codegen/internal/modules/repository"
 	"github.com/go-codegen/go-codegen/internal/parse"
 	"github.com/go-codegen/go-codegen/internal/repository"
@@ -27,13 +28,13 @@ to quickly create a Cobra application.`,
 
 		globalPath, err := cmd.Flags().GetString("path")
 		if err != nil {
-			fmt.Println(err)
+			colorPrint.PrintError(err)
 			return
 		}
 
 		path, err := utils.GetPath(cmd)
 		if err != nil {
-			fmt.Println(err)
+			colorPrint.PrintError(err)
 			return
 		}
 
@@ -44,17 +45,30 @@ to quickly create a Cobra application.`,
 
 		switch args[0] {
 		case "gorm":
+			done := make(chan bool)
+			go utils.showLoadingAnimation(done)
+
 			module := repository_module.NewGorm()
 
 			repo, err := parse.NewParse(path, "")
 
 			if err != nil {
-				fmt.Println("Ошибка:", err)
+				colorPrint.PrintError(err)
 				return
 			}
 
 			body := repository.NewRepository(module, repo)
-			body.Create(outPath)
+			err = body.Create(outPath)
+			if err != nil {
+				colorPrint.PrintError(err)
+				return
+			}
+
+			done <- true
+
+			colorPrint.PrintSuccess("Gorm repository created successfully")
+		default:
+			colorPrint.PrintError(fmt.Errorf("unknown module"))
 		}
 
 	},

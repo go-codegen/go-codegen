@@ -1,7 +1,6 @@
 package filesys
 
 import (
-	"fmt"
 	"github.com/go-codegen/go-codegen/internal/filesys/core"
 	"os"
 	"path/filepath"
@@ -31,8 +30,6 @@ func (f *FileSys) osCreateFile(filename string) (*os.File, error) {
 			dir, _ := filepath.Split(filename)
 
 			dirs := filepath.SplitList(dir)
-
-			fmt.Println(dirs)
 
 			for _, d := range dirs {
 				err := f.osCreateDir(d)
@@ -96,7 +93,7 @@ func (f *FileSys) CreateFile(path string, body filesys.FileBody) error {
 		return err
 	}
 
-	fmt.Printf("Файл %s создан и записан успешно.\n", path)
+	//colorPrint.PrintSuccess(fmt.Sprintf("File %s created successfully.\n", path))
 	return nil
 }
 
@@ -105,7 +102,7 @@ func (f *FileSys) CreateDir(dir string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Директория %s создана успешно.\n", dir)
+	//colorPrint.PrintSuccess(fmt.Sprintf("Dir %s created successfully.\n", dir))
 	return nil
 }
 

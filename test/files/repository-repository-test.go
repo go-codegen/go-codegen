@@ -1,9 +1,6 @@
 package repository
 
-import (
-	"github.com/go-codegen/go-codegen/test"
-	"gorm.io/gorm"
-)
+import "gorm.io/gorm"
 
 type RepositoryTestRepository struct {
 	db *gorm.DB
@@ -60,7 +57,7 @@ func (r *RepositoryTestRepository) Update(r1 *test.RepositoryTest) (*test.Reposi
 	return r1, nil
 }
 func (r *RepositoryTestRepository) Delete(id string) error {
-	if err := r.db.Delete(&test.RepositoryTest{}, "id = ?", id).Error; err != nil {
+	if err := r.db.Delete(&test.RepositoryTest{},"id = ?", id).Error; err != nil {
 		return err
 	}
 

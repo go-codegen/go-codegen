@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/go-codegen/go-codegen/internal/colorPrint"
 	"github.com/spf13/cobra"
 	"os"
 	"strings"
+	"time"
 )
 
 type Utils struct {
@@ -18,7 +20,7 @@ func NewUtils() *Utils {
 func (u *Utils) GetGlobalPath() (string, error) {
 	globalPath, err := os.Getwd()
 	if err != nil {
-		fmt.Println("Ошибка:", err)
+		colorPrint.PrintError(err)
 		return "", err
 	}
 	globalPath = strings.Replace(globalPath, "\\", "/", -1)
@@ -34,7 +36,7 @@ func (u *Utils) GetPath(cmd *cobra.Command) (string, error) {
 
 	path, err := cmd.Flags().GetString("path")
 	if err != nil {
-		fmt.Println("Error: ", err)
+		colorPrint.PrintError(err)
 	}
 
 	path = strings.Replace(path, "\\", "/", -1)
@@ -51,7 +53,7 @@ func (u *Utils) GetOutPath(cmd *cobra.Command) (string, error) {
 
 	outPath, err := cmd.Flags().GetString("out")
 	if err != nil {
-		fmt.Println("Error: ", err)
+		colorPrint.PrintError(err)
 	}
 
 	if outPath == "" {
@@ -59,4 +61,24 @@ func (u *Utils) GetOutPath(cmd *cobra.Command) (string, error) {
 	}
 
 	return outPath, nil
+}
+
+func (u *Utils) showLoadingAnimation(done chan bool) {
+	fmt.Print("   Waiting... ")
+	spinners := []string{"⠁", "⠂", "⠄", "⡀", "⢀", "⠠", "⠐", "⠈"}
+
+	for i := 0; ; i++ {
+		select {
+		case <-done:
+			u.clearLine()
+			return
+		default:
+			fmt.Printf("\r%s", spinners[i%len(spinners)])
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+}
+
+func (u *Utils) clearLine() {
+	fmt.Printf("\r\033[K")
 }

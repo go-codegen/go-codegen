@@ -1,8 +1,7 @@
 package repository
 
 import (
-	"fmt"
-	"github.com/go-codegen/go-codegen/internal/constants"
+	"github.com/go-codegen/go-codegen/internal/colorPrint"
 	"github.com/go-codegen/go-codegen/internal/filesys"
 	filesys_core "github.com/go-codegen/go-codegen/internal/filesys/core"
 	"github.com/go-codegen/go-codegen/internal/parse"
@@ -22,7 +21,6 @@ type Entity struct {
 
 type Module interface {
 	MethodsData(info parse.StructInfo) Methods
-	EntityData(info parse.StructInfo) Entity
 }
 
 type Repository struct {
@@ -39,7 +37,7 @@ func NewRepository(module Module, structInfo *parse.Struct) *Repository {
 	}
 }
 
-func (r *Repository) Create(path string) {
+func (r *Repository) Create(path string) error {
 	if path == "" {
 		path = "./"
 	}
@@ -48,17 +46,19 @@ func (r *Repository) Create(path string) {
 		//e := r.CreateEntity(s)
 		//err := r.File.CreateFile(path+e.Name+".go", e)
 		//if err != nil {
-		//	fmt.Println("Ошибка:", err)
+		//	colorPrint.PrintError( err)
 		//}
 
 		//Repository
 		rm := r.CreateRepositoryMethods(s)
 		err := r.File.CreateFile(path+rm.Name+".go", rm)
 		if err != nil {
-			fmt.Println("Ошибка:", err)
+			colorPrint.PrintError(err)
+			return err
 		}
 	}
 
+	return nil
 }
 
 func (r *Repository) CreateRepositoryMethods(s parse.StructInfo) filesys_core.FileBody {
@@ -84,21 +84,21 @@ func (r *Repository) CreateRepositoryMethods(s parse.StructInfo) filesys_core.Fi
 	return structBody
 }
 
-func (r *Repository) CreateEntity(s parse.StructInfo) filesys_core.FileBody {
-
-	var structBody filesys_core.FileBody
-
-	entityData := r.Module.EntityData(s)
-
-	structBody.Name = r.File.CreateFileNameByStructName(s.Name, "entity-", "")
-
-	structBody.Package = s.Name + string(constants.Suffix)
-
-	for _, i := range entityData.Imports {
-		structBody.Imports = append(structBody.Imports, i)
-	}
-
-	structBody.Structs = append(structBody.Structs, entityData.Struct)
-
-	return structBody
-}
+//func (r *Repository) CreateEntity(s parse.StructInfo) filesys_core.FileBody {
+//
+//	var structBody filesys_core.FileBody
+//
+//	entityData := r.Module.EntityData(s)
+//
+//	structBody.Name = r.File.CreateFileNameByStructName(s.Name, "entity-", "")
+//
+//	structBody.Package = s.Name + string(constants.Suffix)
+//
+//	for _, i := range entityData.Imports {
+//		structBody.Imports = append(structBody.Imports, i)
+//	}
+//
+//	structBody.Structs = append(structBody.Structs, entityData.Struct)
+//
+//	return structBody
+//}
