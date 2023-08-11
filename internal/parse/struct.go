@@ -1,166 +1,185 @@
-package parse
+package main
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
 	"regexp"
 	"strings"
 )
 
-type Struct struct {
-	Filename string
-	Structs  []StructInfo
+type ParsedField struct {
+	Name         string
+	Type         string
+	Tags         map[string][]string
+	NestedStruct *ParsedStruct
 }
 
-type StructInfo struct {
-	Name        string
-	Fields      []FieldInfo
-	PackageName string
+type ParsedStruct struct {
+	StructName   string
+	StructModule string
+	FileName     string
+	Fields       []ParsedField
 }
 
-type FieldInfo struct {
-	Name string
-	Type string
-	Tags map[string][]string
-	Tag  string
+func parseFile(filename string) (*ast.File, error) {
+	fset := token.NewFileSet()
+	return parser.ParseFile(fset, filename, nil, parser.ParseComments)
 }
 
-func NewParse(filename string, prefix string) (*Struct, error) {
-	r := &Struct{
-		Filename: filename,
+func parseTags(tag string) map[string][]string {
+	tags := make(map[string][]string)
+	tag = strings.Trim(tag, "`")
+	tagRegExp := regexp.MustCompile(`([\w]+):"([^"]+)"`)
+	for _, t := range tagRegExp.FindAllStringSubmatch(tag, -1) {
+		tags[t[1]] = strings.Split(t[2], ",")
 	}
-
-	if err := r.parseStructs(prefix); err != nil {
-		return nil, err
-	}
-
-	return r, nil
+	return tags
 }
 
-func (p *Struct) parseStructs(prefix string) error {
-	fileSet := token.NewFileSet()
-	node, err := parser.ParseFile(fileSet, p.Filename, nil, parser.ParseComments)
-	if err != nil {
-		return err
-	}
+func collectFields(fields []*ast.Field) []ParsedField {
+	var parsedFields []ParsedField
+	for _, field := range fields {
+		fmt.Println(field.Type)
+		switch fieldType := field.Type.(type) {
+		case *ast.StructType:
+			// If the field type is a struct, recursively collect its fields
+			if len(field.Names) > 0 {
+				fieldName := field.Names[0].Name
 
-	// Get all structs
-	for _, decl := range node.Decls {
-		// Get all gen declarations
+				// Initialize parsed struct
+				pstruct := ParsedStruct{StructName: fieldName}
+
+				// Parse and collect fields from the nested struct
+				pstruct.Fields = collectFields(fieldType.Fields.List)
+
+				// Construct ParsedField with nested struct information
+				parsedField := ParsedField{
+					Name:         fieldName,
+					Type:         "struct",
+					NestedStruct: &pstruct,
+				}
+
+				parsedFields = append(parsedFields, parsedField)
+			}
+		case *ast.SelectorExpr:
+			// add struct to nested structs
+			parsedFields = append(parsedFields, ParsedField{
+				Name: fmt.Sprintf("%v.%s", fieldType.X, fieldType.Sel.Name),
+				Type: "struct",
+				NestedStruct: &ParsedStruct{
+					StructName:   fieldType.Sel.Name,
+					StructModule: fmt.Sprintf("%v", fieldType.X),
+				},
+			})
+		case *ast.StarExpr:
+			// If the field type is a pointer to another type
+			if len(field.Names) > 0 && fieldType.X != nil {
+				parsedFields = append(parsedFields, ParsedField{
+					Name: field.Names[0].Name,
+					Type: fmt.Sprintf("*%s", fieldType.X),
+				})
+			}
+		case *ast.Ident:
+			// If the field type is a struct, recursively collect its fields
+			if fieldType.Obj != nil {
+				fields := collectFields(fieldType.Obj.Decl.(*ast.TypeSpec).Type.(*ast.StructType).Fields.List)
+
+				var name string
+				if len(field.Names) > 0 {
+					name = field.Names[0].Name
+				} else {
+					name = fieldType.Name
+				}
+
+				parsedFields = append(parsedFields, ParsedField{
+					Name:         name,
+					Type:         "struct",
+					NestedStruct: &ParsedStruct{StructName: fieldType.Name, Fields: fields},
+				})
+				continue
+			}
+			// Assume this is a regular field, collect it ONLY if it has a name
+			if len(field.Names) > 0 {
+				tags := map[string][]string{}
+				if field.Tag != nil {
+					tags = parseTags(field.Tag.Value)
+				}
+				parsedFields = append(parsedFields, ParsedField{
+					Name: field.Names[0].Name,
+					Type: fieldType.Name,
+					Tags: tags,
+				})
+				continue
+			}
+
+		default:
+			fmt.Println("Unknown field type", fieldType)
+			//	print field type
+			fmt.Println(fieldType)
+		}
+
+	}
+	return parsedFields
+}
+
+func processSpecs(decl *ast.GenDecl, filename string) []ParsedStruct {
+	var structs []ParsedStruct
+	for _, spec := range decl.Specs {
+		typeSpec, ok := spec.(*ast.TypeSpec)
+		if !ok {
+			continue
+		}
+		structType, ok := typeSpec.Type.(*ast.StructType)
+		if !ok {
+			continue
+		}
+		fields := collectFields(structType.Fields.List)
+		structs = append(structs, ParsedStruct{FileName: filename, StructName: typeSpec.Name.Name, Fields: fields})
+	}
+	return structs
+}
+
+func parseStructs(filename string, file *ast.File) []ParsedStruct {
+	var structs []ParsedStruct
+	for _, decl := range file.Decls {
 		genDecl, ok := decl.(*ast.GenDecl)
 		if !ok {
 			continue
 		}
+		structs = append(structs, processSpecs(genDecl, filename)...)
+	}
+	return structs
+}
 
-		// Get all type specs
-		for _, spec := range genDecl.Specs {
-			// If not type spec, continue
-			typeSpec, ok := spec.(*ast.TypeSpec)
-			if !ok {
-				continue
+func main() {
+	filename := "test/test.go"
+	file, err := parseFile(filename)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	fmt.Println("parse")
+	structs := parseStructs(filename, file)
+	for _, s := range structs {
+		printStruct(s)
+	}
+}
+
+// print struct
+func printStruct(s ParsedStruct) {
+	fmt.Printf("struct %s {\n", s.StructName)
+	for _, f := range s.Fields {
+		println("\t", f.Name, f.Type)
+		for k, v := range f.Tags {
+			println("\t\t", k)
+			for _, vv := range v {
+				println("\t\t\t", vv)
 			}
-
-			structName := typeSpec.Name.Name
-
-			// If it does not have prefix, continue
-			if !strings.HasPrefix(structName, prefix) {
-				continue
-			}
-
-			// Find all fields
-			fields, fieldErr := p.getFields(typeSpec.Type)
-			if fieldErr != nil {
-				return fieldErr
-			}
-
-			// Append struct
-			p.Structs = append(p.Structs, StructInfo{
-				Name:        strings.TrimPrefix(structName, prefix),
-				Fields:      fields,
-				PackageName: node.Name.Name,
-			})
 		}
 	}
-	return nil
-}
-
-func (p *Struct) getFields(node ast.Node) ([]FieldInfo, error) {
-	var fields []FieldInfo
-	if structType, ok := node.(*ast.StructType); ok {
-		for _, field := range structType.Fields.List {
-
-			if field.Names == nil {
-				continue
-			}
-
-			fieldName := field.Names[0].Name
-			fieldType := p.getTypeFromExpr(field.Type)
-
-			var fieldTags map[string][]string
-			if field.Tag != nil {
-				var tagErr error
-				fieldTags, tagErr = p.parseAllTagsInField(field.Tag.Value)
-
-				if tagErr != nil {
-					return nil, tagErr
-				}
-			}
-
-			var tag string
-			if field.Tag != nil {
-				tag = field.Tag.Value
-			}
-
-			fields = append(fields, FieldInfo{
-				Name: fieldName,
-				Type: fieldType,
-				Tags: fieldTags,
-				Tag:  tag,
-			})
-
-		}
-	}
-	return fields, nil
-}
-
-func (p *Struct) parseAllTagsInField(tags string) (map[string][]string, error) {
-	re := regexp.MustCompile(`(\w+):"([^"]+)"`)
-	matches := re.FindAllStringSubmatch(tags, -1)
-
-	keyValueMap := make(map[string][]string)
-	for _, match := range matches {
-		key := match[1]
-		value := match[2]
-		values := strings.Split(value, " ")
-		keyValueMap[key] = values
-	}
-
-	return keyValueMap, nil
-
-}
-
-func (p *Struct) getTypeFromExpr(expr ast.Expr) string {
-	switch exprType := expr.(type) {
-	case *ast.Ident:
-		return exprType.Name
-	case *ast.StarExpr:
-		return "*" + p.getTypeFromExpr(exprType.X)
-	case *ast.SelectorExpr:
-		return p.getTypeFromExpr(exprType.X) + "." + exprType.Sel.Name
-	case *ast.ArrayType:
-		return "[]" + p.getTypeFromExpr(exprType.Elt)
-	case *ast.MapType:
-		return "map[" + p.getTypeFromExpr(exprType.Key) + "]" + p.getTypeFromExpr(exprType.Value)
-	case *ast.InterfaceType:
-		return "interface{}"
-	case *ast.FuncType:
-		return "func(...)"
-	case *ast.ChanType:
-		return "chan " + p.getTypeFromExpr(exprType.Value)
-	case *ast.StructType:
-		return "struct{}"
-	default:
-		return ""
-	}
+	//nested
+	fmt.Println("}")
 }
