@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/go-codegen/go-codegen/internal/colorPrint"
+	"github.com/go-codegen/go-codegen/internal/utils"
 	"github.com/spf13/cobra"
 	"strings"
 	"time"
@@ -17,7 +18,7 @@ func NewUtils() *Utils {
 }
 
 func (u *Utils) GetPath(cmd *cobra.Command) (string, error) {
-	globalPath, err := u.GetGlobalPath()
+	globalPath, err := utils.GetGlobalPath()
 	if err != nil {
 		return "", err
 	}
@@ -34,7 +35,7 @@ func (u *Utils) GetPath(cmd *cobra.Command) (string, error) {
 }
 
 func (u *Utils) GetOutPath(cmd *cobra.Command) (string, error) {
-	globalPath, err := u.GetGlobalPath()
+	globalPath, err := utils.GetGlobalPath()
 	if err != nil {
 		return "", err
 	}

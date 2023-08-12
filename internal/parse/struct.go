@@ -1,4 +1,4 @@
-package main
+package parse
 
 import (
 	"bufio"
@@ -157,7 +157,6 @@ func (s *StructImpl) findFileByNameImport(name string) ([][]ParsedStruct, error)
 				}
 
 				if file != nil {
-					println("file found")
 					//	parse package name
 					scanner := bufio.NewScanner(file)
 					for scanner.Scan() {
@@ -320,9 +319,12 @@ func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool)
 				}
 
 				parsedFields = append(parsedFields, ParsedField{
-					Name:         name,
-					Type:         "struct",
-					NestedStruct: &ParsedStruct{StructName: fieldType.Name, Fields: fields},
+					Name: name,
+					Type: "struct",
+					NestedStruct: &ParsedStruct{
+						StructName: fieldType.Name,
+						Fields:     fields,
+					},
 				})
 				continue
 			}
@@ -361,11 +363,7 @@ func (s *StructImpl) processSpecs(decl *ast.GenDecl, filename string, fromAnothe
 		}
 		fields := s.collectFields(structType.Fields.List, fromAnotherPackage)
 
-		if typeSpec.Name.Name == "Model" {
-			fmt.Println(fields)
-		}
-
-		structs = append(structs, ParsedStruct{FileName: filename, StructName: typeSpec.Name.Name, Fields: fields})
+		structs = append(structs, ParsedStruct{FileName: filename, StructName: typeSpec.Name.Name, Fields: fields, StructModule: s.f.Name.Name})
 	}
 	return structs
 }
@@ -382,32 +380,43 @@ func (s *StructImpl) parseStructs(filename string, file *ast.File, fromAnotherPa
 	return structs
 }
 
-func main() {
-	filename := "test/test.go"
-	s := StructImpl{}
+func (s *StructImpl) ParseStructInFiles(filename string) ([]ParsedStruct, error) {
 	file, err := s.parseFile(filename)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 	structs := s.parseStructs(filename, file, false)
-	for _, s := range structs {
-		printStruct(s)
-	}
+
+	return structs, err
 }
 
-// print struct
-func printStruct(s ParsedStruct) {
-	fmt.Printf("struct %s {\n", s.StructName)
-	for _, f := range s.Fields {
-		println("\t", f.Name, f.Type)
-		for k, v := range f.Tags {
-			println("\t\t", k)
-			for _, vv := range v {
-				println("\t\t\t", vv)
-			}
-		}
-	}
-	//nested
-	fmt.Println("}")
-}
+//func main() {
+//	filename := "test/test.go"
+//	s := StructImpl{}
+//	structs, err := s.ParseStructInFiles(filename)
+//	if err != nil {
+//		fmt.Println(err)
+//		os.Exit(1)
+//	}
+//
+//	for _, s := range structs {
+//		printStruct(s)
+//	}
+//}
+//
+//// print struct
+//func printStruct(s ParsedStruct) {
+//	fmt.Printf("struct %s {\n", s.StructName)
+//	for _, f := range s.Fields {
+//		println("\t", f.Name, f.Type)
+//		for k, v := range f.Tags {
+//			println("\t\t", k)
+//			for _, vv := range v {
+//				println("\t\t\t", vv)
+//			}
+//		}
+//	}
+//	//nested
+//	fmt.Println("}")
+//}

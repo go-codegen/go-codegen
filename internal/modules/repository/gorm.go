@@ -21,20 +21,22 @@ func NewGorm() *Gorm {
 	}
 }
 
-func (g *Gorm) MethodsData(info parse.StructInfo) repository.Methods {
+func (g *Gorm) MethodsData(info parse.ParsedStruct) repository.Methods {
 	var methods repository.Methods
 
 	methods.Imports = g.createRepositoryImports()
 
-	methods.Struct = g.createRepositoryStruct(info.Name + string(g.suffix))
+	methods.Struct = g.createRepositoryStruct(info.StructName + string(g.suffix))
 
 	methods.Funcs = append(methods.Funcs, g.create(info))
 	methods.Funcs = append(methods.Funcs, g.find(info))
+
 	findFuncs := g.findByAllFields(info)
 
 	for _, f := range findFuncs {
 		methods.Funcs = append(methods.Funcs, f)
 	}
+
 	methods.Funcs = append(methods.Funcs, g.update(info))
 	methods.Funcs = append(methods.Funcs, g.delete(info))
 
@@ -42,15 +44,15 @@ func (g *Gorm) MethodsData(info parse.StructInfo) repository.Methods {
 
 }
 
-func (g *Gorm) create(info parse.StructInfo) filesys_core.FuncBody {
+func (g *Gorm) create(info parse.ParsedStruct) filesys_core.FuncBody {
 	var function filesys_core.FuncBody
 
-	entityName := info.PackageName + "." + info.Name
-	variableName := g.getVariableName(info.Name)
+	entityName := info.StructModule + "." + info.StructName
+	variableName := g.getVariableName(info.StructName)
 
 	function.Name = "Create"
 	function.StructSymbol = g.structSymbol
-	function.StructName = info.Name + string(g.suffix)
+	function.StructName = info.StructName + string(g.suffix)
 
 	function.Ars = append(function.Ars, variableName+" *"+entityName)
 	function.ReturnValues = append(function.ReturnValues, "*"+entityName, "error")
@@ -88,14 +90,14 @@ func (g *Gorm) createRepositoryImports() []string {
 }
 
 // delete func
-func (g *Gorm) delete(info parse.StructInfo) filesys_core.FuncBody {
+func (g *Gorm) delete(info parse.ParsedStruct) filesys_core.FuncBody {
 	var function filesys_core.FuncBody
 	function.Name = "Delete"
 
-	entityName := info.PackageName + "." + info.Name
+	entityName := info.StructModule + "." + info.StructName
 
 	function.StructSymbol = g.structSymbol
-	function.StructName = info.Name + string(g.suffix)
+	function.StructName = info.StructName + string(g.suffix)
 	function.Ars = append(function.Ars, "id string")
 	function.ReturnValues = append(function.ReturnValues, "error")
 
@@ -104,15 +106,15 @@ func (g *Gorm) delete(info parse.StructInfo) filesys_core.FuncBody {
 }
 
 // update func
-func (g *Gorm) update(info parse.StructInfo) filesys_core.FuncBody {
+func (g *Gorm) update(info parse.ParsedStruct) filesys_core.FuncBody {
 	var function filesys_core.FuncBody
 
 	function.Name = "Update"
-	entityName := info.PackageName + "." + info.Name
-	variableName := g.getVariableName(info.Name)
+	entityName := info.StructModule + "." + info.StructName
+	variableName := g.getVariableName(info.StructName)
 
 	function.StructSymbol = g.structSymbol
-	function.StructName = info.Name + string(g.suffix)
+	function.StructName = info.StructName + string(g.suffix)
 	function.Ars = append(function.Ars, variableName+" *"+entityName)
 	function.ReturnValues = append(function.ReturnValues, "*"+entityName, "error")
 
@@ -121,16 +123,16 @@ func (g *Gorm) update(info parse.StructInfo) filesys_core.FuncBody {
 }
 
 // findById func where id = ?
-func (g *Gorm) find(info parse.StructInfo) filesys_core.FuncBody {
+func (g *Gorm) find(info parse.ParsedStruct) filesys_core.FuncBody {
 	var function filesys_core.FuncBody
 
 	function.Name = "FindByID"
 
-	entityName := info.PackageName + "." + info.Name
-	variableName := g.getVariableName(info.Name)
+	entityName := info.StructModule + "." + info.StructName
+	variableName := g.getVariableName(info.StructName)
 
 	function.StructSymbol = "r"
-	function.StructName = info.Name + string(g.suffix)
+	function.StructName = info.StructName + string(g.suffix)
 	function.Ars = append(function.Ars, "id string")
 	function.ReturnValues = append(function.ReturnValues, "*"+entityName, "error")
 
@@ -138,8 +140,8 @@ func (g *Gorm) find(info parse.StructInfo) filesys_core.FuncBody {
 	return function
 }
 
-// findByAllFields func where field = ?
-func (g *Gorm) findByAllFields(info parse.StructInfo) []filesys_core.FuncBody {
+// // findByAllFields func where field = ?
+func (g *Gorm) findByAllFields(info parse.ParsedStruct) []filesys_core.FuncBody {
 	var functions []filesys_core.FuncBody
 
 	for _, f := range info.Fields {
@@ -147,7 +149,7 @@ func (g *Gorm) findByAllFields(info parse.StructInfo) []filesys_core.FuncBody {
 
 		checkField := strings.ToLower(f.Name)
 
-		if checkField == "id" || checkField == "createdat" || checkField == "updatedat" || checkField == "deletedat" {
+		if checkField == "id" || checkField == "gorm.model" || checkField == "createdat" || checkField == "updatedat" || checkField == "deletedat" {
 			continue
 		}
 
@@ -163,13 +165,17 @@ func (g *Gorm) findByAllFields(info parse.StructInfo) []filesys_core.FuncBody {
 			}
 		}
 
+		if f.Type == "struct" {
+			continue
+		}
+
 		if unique {
 			//	find one
-			function = g.findOne(f, info.PackageName, info.Name)
+			function = g.findOne(f, info.StructModule, info.StructName)
 			functions = append(functions, function)
 		} else {
 			//find many
-			function = g.findMany(f, info.PackageName, info.Name)
+			function = g.findMany(f, info.StructModule, info.StructName)
 			functions = append(functions, function)
 		}
 
@@ -179,7 +185,7 @@ func (g *Gorm) findByAllFields(info parse.StructInfo) []filesys_core.FuncBody {
 }
 
 // findBY func where field = ?
-func (g *Gorm) findOne(f parse.FieldInfo, packageName, name string) filesys_core.FuncBody {
+func (g *Gorm) findOne(f parse.ParsedField, packageName, name string) filesys_core.FuncBody {
 
 	var function filesys_core.FuncBody
 	entityName := packageName + "." + name
@@ -200,7 +206,7 @@ func (g *Gorm) findOne(f parse.FieldInfo, packageName, name string) filesys_core
 }
 
 // findMany func where field = ?
-func (g *Gorm) findMany(f parse.FieldInfo, packageName, name string) filesys_core.FuncBody {
+func (g *Gorm) findMany(f parse.ParsedField, packageName, name string) filesys_core.FuncBody {
 
 	var function filesys_core.FuncBody
 	entityName := packageName + "." + name

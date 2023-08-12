@@ -20,16 +20,16 @@ type Entity struct {
 }
 
 type Module interface {
-	MethodsData(info parse.StructInfo) Methods
+	MethodsData(info parse.ParsedStruct) Methods
 }
 
 type Repository struct {
 	Module Module
-	Struct *parse.Struct
+	Struct []parse.ParsedStruct
 	File   *filesys.FileSys
 }
 
-func NewRepository(module Module, structInfo *parse.Struct) *Repository {
+func NewRepository(module Module, structInfo []parse.ParsedStruct) *Repository {
 	return &Repository{
 		Module: module,
 		Struct: structInfo,
@@ -41,15 +41,7 @@ func (r *Repository) Create(path string) error {
 	if path == "" {
 		path = "./"
 	}
-	for _, s := range r.Struct.Structs {
-		////Entity
-		//e := r.CreateEntity(s)
-		//err := r.File.CreateFile(path+e.Name+".go", e)
-		//if err != nil {
-		//	colorPrint.PrintError( err)
-		//}
-
-		//Repository
+	for _, s := range r.Struct {
 		rm := r.CreateRepositoryMethods(s)
 		err := r.File.CreateFile(path+rm.Name+".go", rm)
 		if err != nil {
@@ -61,13 +53,13 @@ func (r *Repository) Create(path string) error {
 	return nil
 }
 
-func (r *Repository) CreateRepositoryMethods(s parse.StructInfo) filesys_core.FileBody {
+func (r *Repository) CreateRepositoryMethods(s parse.ParsedStruct) filesys_core.FileBody {
 
 	var structBody filesys_core.FileBody
 
 	repositoryData := r.Module.MethodsData(s)
 
-	structBody.Name = r.File.CreateFileNameByStructName(s.Name, "repository-", "")
+	structBody.Name = r.File.CreateFileNameByStructName(s.StructName, "repository-", "")
 
 	structBody.Package = "repository"
 

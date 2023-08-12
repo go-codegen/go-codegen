@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/go-codegen/go-codegen/internal/colorPrint"
 	repository_module "github.com/go-codegen/go-codegen/internal/modules/repository"
+	"github.com/go-codegen/go-codegen/internal/parse"
 	"github.com/go-codegen/go-codegen/internal/repository"
 	"github.com/spf13/cobra"
 )
@@ -45,18 +46,19 @@ to quickly create a Cobra application.`,
 		switch args[0] {
 		case "gorm":
 			done := make(chan bool)
-			go utils.showLoadingAnimation(done)
+			go utils.ShowLoadingAnimation(done)
 
 			module := repository_module.NewGorm()
 
-			repo, err := parse.NewParse(path, "")
+			parseStruct := parse.NewStruct()
 
+			structs, err := parseStruct.ParseStructInFiles(path)
 			if err != nil {
 				colorPrint.PrintError(err)
 				return
 			}
 
-			body := repository.NewRepository(module, repo)
+			body := repository.NewRepository(module, structs)
 			err = body.Create(outPath)
 			if err != nil {
 				colorPrint.PrintError(err)
