@@ -99,7 +99,7 @@ func (s *StructImpl) findStructByName(structs [][]ParsedStruct, name string) []P
 	return result
 }
 
-func (s *StructImpl) findFileByNameImport(name string) ([][]ParsedStruct, error) {
+func (s *StructImpl) findFileByNameImport(name string, anotherPackage bool) ([][]ParsedStruct, error) {
 	for _, imp := range s.f.Imports {
 		imp.Path.Value = strings.Trim(imp.Path.Value, "\"")
 		parts := strings.Split(imp.Path.Value, "/")
@@ -117,7 +117,7 @@ func (s *StructImpl) findFileByNameImport(name string) ([][]ParsedStruct, error)
 			}
 			var parsedStructs [][]ParsedStruct
 			for _, f := range files {
-				parsedStructs = append(parsedStructs, s.parseStructs(f.Name.Name, f))
+				parsedStructs = append(parsedStructs, s.parseStructs(f.Name.Name, f, anotherPackage))
 			}
 
 			return parsedStructs, nil
@@ -126,7 +126,7 @@ func (s *StructImpl) findFileByNameImport(name string) ([][]ParsedStruct, error)
 	return nil, fmt.Errorf("no file found")
 }
 
-func (s *StructImpl) collectFields(fields []*ast.Field) []ParsedField {
+func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool) []ParsedField {
 	var parsedFields []ParsedField
 	for _, field := range fields {
 		switch fieldType := field.Type.(type) {
@@ -139,7 +139,7 @@ func (s *StructImpl) collectFields(fields []*ast.Field) []ParsedField {
 				pstruct := ParsedStruct{StructName: fieldName}
 
 				// Parse and collect fields from the nested struct
-				pstruct.Fields = s.collectFields(fieldType.Fields.List)
+				pstruct.Fields = s.collectFields(fieldType.Fields.List, fromAnotherPackage)
 
 				// Construct ParsedField with nested struct information
 				parsedField := ParsedField{
@@ -151,6 +151,9 @@ func (s *StructImpl) collectFields(fields []*ast.Field) []ParsedField {
 				parsedFields = append(parsedFields, parsedField)
 			}
 		case *ast.SelectorExpr:
+			fmt.Println(fieldType)
+			//TODO ADD SUPPORT FOR EMBEDDED STRUCTS
+
 			if fmt.Sprintf("%v", fieldType.X) == "time" {
 				parsedFields = append(parsedFields, ParsedField{
 					Name: field.Names[0].Name,
@@ -162,33 +165,59 @@ func (s *StructImpl) collectFields(fields []*ast.Field) []ParsedField {
 				})
 				continue
 			}
-			structures, err := s.findFileByNameImport(fmt.Sprintf("%v", fieldType.X))
-			if err != nil {
-				return nil
+			// CREATE CHECK GO MOD IMPORT PATH OR NOT
+			//проблема в том, что тут может быть не только импорт из go mod (например, если это gorm.Model)
+			//а также может быть импорт из своего пакета.
+			//TODO: нужно придумать изящный check на то, что это импорт из go mod или нет
+			//chech if import is from go mod or not
+
+			//check for name "github.com/..."
+
+			if strings.Contains(fmt.Sprintf("%v", fieldType.X), "github.com") || strings.Contains(fmt.Sprintf("%v", fieldType.X), "gorm") {
+				structures, err := s.findFileByNameImport(fmt.Sprintf("%v", fieldType.X), true)
+				if err != nil {
+					return nil
+				}
+				structs := s.findStructByName(structures, fieldType.Sel.Name)
+				if len(structs) > 0 {
+					parsedFields = append(parsedFields, ParsedField{
+						Name: fmt.Sprintf("%v.%s", fieldType.X, fieldType.Sel.Name),
+						Type: "struct",
+						NestedStruct: &ParsedStruct{
+							StructName:   fieldType.Sel.Name,
+							StructModule: fmt.Sprintf("%v", fieldType.X),
+							FileName:     structs[0].FileName,
+							Fields:       structs[0].Fields,
+						},
+					})
+					continue
+				}
 			}
-			structs := s.findStructByName(structures, fieldType.Sel.Name)
-			if len(structs) > 0 {
+
+			//нужно как то проверить что это рекурсивный вызов функции или нет
+			if fromAnotherPackage {
 				parsedFields = append(parsedFields, ParsedField{
 					Name: fmt.Sprintf("%v.%s", fieldType.X, fieldType.Sel.Name),
 					Type: "struct",
 					NestedStruct: &ParsedStruct{
 						StructName:   fieldType.Sel.Name,
 						StructModule: fmt.Sprintf("%v", fieldType.X),
-						FileName:     structs[0].FileName,
-						Fields:       structs[0].Fields,
 					},
 				})
-				continue
+			} else {
+				//find local file
+				//parse dir local file
+				//find struct by name
+				//add to Fields
+				parsedFields = append(parsedFields, ParsedField{
+					Name: field.Names[0].Name,
+					Type: fmt.Sprintf("%v.%s", fieldType.X, fieldType.Sel.Name),
+					NestedStruct: &ParsedStruct{
+						StructName:   fieldType.Sel.Name,
+						StructModule: fmt.Sprintf("%v", fieldType.X),
+					},
+				})
 			}
-			// add struct to nested structs
-			parsedFields = append(parsedFields, ParsedField{
-				Name: fmt.Sprintf("%v.%s", fieldType.X, fieldType.Sel.Name),
-				Type: "struct",
-				NestedStruct: &ParsedStruct{
-					StructName:   fieldType.Sel.Name,
-					StructModule: fmt.Sprintf("%v", fieldType.X),
-				},
-			})
 		case *ast.StarExpr:
 			// If the field type is a pointer to another type
 			if len(field.Names) > 0 && fieldType.X != nil {
@@ -199,8 +228,6 @@ func (s *StructImpl) collectFields(fields []*ast.Field) []ParsedField {
 			}
 		case *ast.Ident:
 			// If the field type is a struct, recursively collect its fields
-
-			//TODO ADD SUPPORT FOR EMBEDDED STRUCTS
 
 			if fieldType.Obj != nil {
 				decl, ok := fieldType.Obj.Decl.(*ast.TypeSpec)
@@ -213,7 +240,7 @@ func (s *StructImpl) collectFields(fields []*ast.Field) []ParsedField {
 					log.Fatal("Not a *ast.StructType")
 				}
 
-				fields := s.collectFields(astStruct.Fields.List)
+				fields := s.collectFields(astStruct.Fields.List, fromAnotherPackage)
 				var name string
 				if len(field.Names) > 0 {
 					name = field.Names[0].Name
@@ -250,7 +277,7 @@ func (s *StructImpl) collectFields(fields []*ast.Field) []ParsedField {
 	return parsedFields
 }
 
-func (s *StructImpl) processSpecs(decl *ast.GenDecl, filename string) []ParsedStruct {
+func (s *StructImpl) processSpecs(decl *ast.GenDecl, filename string, fromAnotherPackage bool) []ParsedStruct {
 	var structs []ParsedStruct
 	for _, spec := range decl.Specs {
 		typeSpec, ok := spec.(*ast.TypeSpec)
@@ -261,21 +288,25 @@ func (s *StructImpl) processSpecs(decl *ast.GenDecl, filename string) []ParsedSt
 		if !ok {
 			continue
 		}
-		fields := s.collectFields(structType.Fields.List)
+		fields := s.collectFields(structType.Fields.List, fromAnotherPackage)
+
+		if typeSpec.Name.Name == "Model" {
+			fmt.Println(fields)
+		}
 
 		structs = append(structs, ParsedStruct{FileName: filename, StructName: typeSpec.Name.Name, Fields: fields})
 	}
 	return structs
 }
 
-func (s *StructImpl) parseStructs(filename string, file *ast.File) []ParsedStruct {
+func (s *StructImpl) parseStructs(filename string, file *ast.File, fromAnotherPackage bool) []ParsedStruct {
 	var structs []ParsedStruct
 	for _, decl := range file.Decls {
 		genDecl, ok := decl.(*ast.GenDecl)
 		if !ok {
 			continue
 		}
-		structs = append(structs, s.processSpecs(genDecl, filename)...)
+		structs = append(structs, s.processSpecs(genDecl, filename, fromAnotherPackage)...)
 	}
 	return structs
 }
@@ -288,7 +319,7 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	structs := s.parseStructs(filename, file)
+	structs := s.parseStructs(filename, file, false)
 	for _, s := range structs {
 		printStruct(s)
 	}
