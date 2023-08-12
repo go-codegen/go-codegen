@@ -227,7 +227,7 @@ func (s *StructImpl) findGoMode(path string, packageName string) (*os.File, erro
 			}
 		}
 	}
-	return nil, fmt.Errorf("no file found")
+	return nil, fmt.Errorf("no file found 1")
 }
 
 func (s *StructImpl) findPackageNameByOsFile(file *os.File) (string, error) {
@@ -301,7 +301,7 @@ func (s *StructImpl) transformPathAndImport(pathArg string, importArg string) (s
 func (s *StructImpl) createPackagePath(filename string, name string) (string, error) {
 	findGoMod, err := s.findGoMode(filename, fmt.Sprintf("%v", name))
 	if err != nil {
-		colorPrint.PrintError(err)
+		return "", err
 	}
 
 	findPackageName := filename
@@ -538,33 +538,3 @@ func (s *StructImpl) ParseStructInFiles(filename string) ([]ParsedStruct, error)
 
 	return structs, err
 }
-
-//func main() {
-//	filename := "test/test.go"
-//	s := StructImpl{}
-//	structs, err := s.ParseStructInFiles(filename)
-//	if err != nil {
-//		fmt.Println(err)
-//		os.Exit(1)
-//	}
-//
-//	for _, s := range structs {
-//		printStruct(s)
-//	}
-//}
-//
-//// print struct
-//func printStruct(s ParsedStruct) {
-//	fmt.Printf("struct %s {\n", s.StructName)
-//	for _, f := range s.Fields {
-//		println("\t", f.Name, f.Type)
-//		for k, v := range f.Tags {
-//			println("\t\t", k)
-//			for _, vv := range v {
-//				println("\t\t\t", vv)
-//			}
-//		}
-//	}
-//	//nested
-//	fmt.Println("}")
-//}

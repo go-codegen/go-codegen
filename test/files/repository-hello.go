@@ -1,6 +1,9 @@
 package repository
 
-import "gorm.io/gorm"
+import (
+	"gorm.io/gorm"
+	"github.com/go-codegen/go-codegen/test"
+)
 
 type HelloRepository struct {
 	db *gorm.DB

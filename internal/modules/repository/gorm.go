@@ -13,6 +13,7 @@ import (
 type Gorm struct {
 	suffix       string
 	structSymbol string
+	imports      []string
 }
 
 func NewGorm() *Gorm {
@@ -25,8 +26,8 @@ func NewGorm() *Gorm {
 func (g *Gorm) MethodsData(info parse.ParsedStruct) repository.Methods {
 	var methods repository.Methods
 
-	methods.Imports = g.createRepositoryImports()
-
+	g.addImportFromField("gorm.io/gorm")
+	g.addImportFromField(info.PathToPackage)
 	methods.Struct = g.createRepositoryStruct(info.StructName + string(g.suffix))
 
 	methods.Funcs = append(methods.Funcs, g.create(info))
@@ -49,8 +50,21 @@ func (g *Gorm) MethodsData(info parse.ParsedStruct) repository.Methods {
 	methods.Funcs = append(methods.Funcs, g.update(info))
 	methods.Funcs = append(methods.Funcs, g.delete(info))
 
+	methods.Imports = g.imports
+
 	return methods
 
+}
+
+func (g *Gorm) addImportFromField(imp string) {
+	//если импорт уже есть, то не добавляем его
+	for _, i := range g.imports {
+		if i == imp {
+			return
+		}
+	}
+
+	g.imports = append(g.imports, imp)
 }
 
 func (g *Gorm) create(info parse.ParsedStruct) filesys_core.FuncBody {
@@ -88,14 +102,6 @@ func (g *Gorm) createRepositoryStruct(name string) filesys_core.StructBody {
 	entity.Fields = append(entity.Fields, "db *gorm.DB")
 
 	return entity
-}
-
-func (g *Gorm) createRepositoryImports() []string {
-	var imports []string
-
-	imports = append(imports, "gorm.io/gorm")
-
-	return imports
 }
 
 // delete func
@@ -200,6 +206,10 @@ func (g *Gorm) findOne(f parse.ParsedField, packageName, name string) filesys_co
 	entityName := packageName + "." + name
 	variableName := g.getVariableName(name)
 
+	if f.NestedStruct != nil {
+		g.addImportFromField(f.NestedStruct.PathToPackage)
+	}
+
 	function.Name = "FindBy" + f.Name
 	function.StructSymbol = "r"
 	function.StructName = name + string(g.suffix)
@@ -220,7 +230,9 @@ func (g *Gorm) findMany(f parse.ParsedField, packageName, name string) filesys_c
 	var function filesys_core.FuncBody
 	entityName := packageName + "." + name
 	variableName := g.getVariableName(name)
-
+	if f.NestedStruct != nil {
+		g.addImportFromField(f.NestedStruct.PathToPackage)
+	}
 	function.Name = "FindBy" + f.Name
 	function.StructSymbol = "r"
 	function.StructName = name + string(g.suffix)
