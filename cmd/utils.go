@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/go-codegen/go-codegen/internal/colorPrint"
 	"github.com/spf13/cobra"
-	"os"
 	"strings"
 	"time"
 )
@@ -15,17 +14,6 @@ type Utils struct {
 
 func NewUtils() *Utils {
 	return &Utils{}
-}
-
-func (u *Utils) GetGlobalPath() (string, error) {
-	globalPath, err := os.Getwd()
-	if err != nil {
-		colorPrint.PrintError(err)
-		return "", err
-	}
-	globalPath = strings.Replace(globalPath, "\\", "/", -1)
-	globalPath += "/"
-	return globalPath, nil
 }
 
 func (u *Utils) GetPath(cmd *cobra.Command) (string, error) {
@@ -63,7 +51,7 @@ func (u *Utils) GetOutPath(cmd *cobra.Command) (string, error) {
 	return outPath, nil
 }
 
-func (u *Utils) showLoadingAnimation(done chan bool) {
+func (u *Utils) ShowLoadingAnimation(done chan bool) {
 	fmt.Print("   Waiting... ")
 	spinners := []string{"⠁", "⠂", "⠄", "⡀", "⢀", "⠠", "⠐", "⠈"}
 

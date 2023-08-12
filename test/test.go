@@ -1,7 +1,7 @@
 package test
 
 import (
-	xz "github.com/go-codegen/go-codegen/test/files"
+	"github.com/go-codegen/go-codegen/test/xz"
 	"gorm.io/gorm"
 )
 

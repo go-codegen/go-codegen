@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/go-codegen/go-codegen/internal/colorPrint"
 	repository_module "github.com/go-codegen/go-codegen/internal/modules/repository"
-	"github.com/go-codegen/go-codegen/internal/parse"
 	"github.com/go-codegen/go-codegen/internal/repository"
 	"github.com/spf13/cobra"
 )
@@ -20,7 +19,7 @@ var createRepositoryCmd = &cobra.Command{
 and usage of using your command. For example:
  
 Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
+This application is a tool to generate the needed xz
 to quickly create a Cobra application.`,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {

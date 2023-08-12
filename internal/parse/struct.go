@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"github.com/go-codegen/go-codegen/internal/colorPrint"
+	"github.com/go-codegen/go-codegen/internal/utils"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -53,7 +56,7 @@ func (s *StructImpl) parseDir(path string) ([]*ast.File, error) {
 		pathWithoutLastPart += parts[i] + "/"
 	}
 
-	//find files in path
+	//find xz in path
 	fInDir, err := os.ReadDir(pathWithoutLastPart)
 	if err != nil {
 		return nil, err
@@ -99,7 +102,7 @@ func (s *StructImpl) findStructByName(structs [][]ParsedStruct, name string) []P
 	return result
 }
 
-func (s *StructImpl) findFileByNameImport(name string, anotherPackage bool) ([][]ParsedStruct, error) {
+func (s *StructImpl) findFileByNameImportOutSide(name string) ([][]ParsedStruct, error) {
 	for _, imp := range s.f.Imports {
 		imp.Path.Value = strings.Trim(imp.Path.Value, "\"")
 		parts := strings.Split(imp.Path.Value, "/")
@@ -117,13 +120,75 @@ func (s *StructImpl) findFileByNameImport(name string, anotherPackage bool) ([][
 			}
 			var parsedStructs [][]ParsedStruct
 			for _, f := range files {
-				parsedStructs = append(parsedStructs, s.parseStructs(f.Name.Name, f, anotherPackage))
+				parsedStructs = append(parsedStructs, s.parseStructs(f.Name.Name, f, true))
 			}
 
 			return parsedStructs, nil
 		}
+
 	}
 	return nil, fmt.Errorf("no file found")
+}
+
+// find file in project
+func (s *StructImpl) findFileByNameImport(name string) ([][]ParsedStruct, error) {
+	//	get global path then up to filesys where is go.mod is located
+	globalPath, err := utils.GetGlobalPath()
+	if err != nil {
+		return nil, err
+	}
+	var parsedStructs [][]ParsedStruct
+	for _, imp := range s.f.Imports {
+		// поиск файла go.mod
+		importPath := strings.Trim(imp.Path.Value, "\"")
+		parts := strings.Split(importPath, "/")
+		lastPart := parts[len(parts)-1]
+
+		if lastPart == name {
+
+			for i := len(parts); i >= 0; i-- {
+				pathToGoMod := globalPath + strings.Join(parts[:i], "/") + "/go.mod"
+				//delete double //
+				pathToGoMod = strings.Replace(pathToGoMod, "//", "/", -1)
+
+				file, err := os.Open(pathToGoMod)
+				if err != nil {
+					continue
+				}
+
+				if file != nil {
+					println("file found")
+					//	parse package name
+					scanner := bufio.NewScanner(file)
+					for scanner.Scan() {
+						line := scanner.Text()
+						if strings.Contains(line, "module") {
+							parts := strings.Split(line, " ")
+							if len(parts) > 1 {
+								packageName := parts[1]
+								packageName = strings.Trim(packageName, "\"")
+								newPath := strings.Replace(pathToGoMod, "/go.mod", "", -1)
+								newImportPath := strings.Replace(importPath, packageName, "", -1)
+								newPath = newPath + newImportPath
+
+								//	parse dir
+								files, err := s.parseDir(newPath)
+								if err != nil {
+									return nil, err
+								}
+
+								for _, f := range files {
+									parsedStructs = append(parsedStructs, s.parseStructs(f.Name.Name, f, true))
+								}
+							}
+						}
+					}
+				}
+
+			}
+		}
+	}
+	return parsedStructs, nil
 }
 
 func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool) []ParsedField {
@@ -151,9 +216,6 @@ func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool)
 				parsedFields = append(parsedFields, parsedField)
 			}
 		case *ast.SelectorExpr:
-			fmt.Println(fieldType)
-			//TODO ADD SUPPORT FOR EMBEDDED STRUCTS
-
 			if fmt.Sprintf("%v", fieldType.X) == "time" {
 				parsedFields = append(parsedFields, ParsedField{
 					Name: field.Names[0].Name,
@@ -174,7 +236,7 @@ func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool)
 			//check for name "github.com/..."
 
 			if strings.Contains(fmt.Sprintf("%v", fieldType.X), "github.com") || strings.Contains(fmt.Sprintf("%v", fieldType.X), "gorm") {
-				structures, err := s.findFileByNameImport(fmt.Sprintf("%v", fieldType.X), true)
+				structures, err := s.findFileByNameImportOutSide(fmt.Sprintf("%v", fieldType.X))
 				if err != nil {
 					return nil
 				}
@@ -190,8 +252,9 @@ func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool)
 							Fields:       structs[0].Fields,
 						},
 					})
-					continue
+
 				}
+				continue
 			}
 
 			//нужно как то проверить что это рекурсивный вызов функции или нет
@@ -205,18 +268,26 @@ func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool)
 					},
 				})
 			} else {
-				//find local file
-				//parse dir local file
-				//find struct by name
-				//add to Fields
-				parsedFields = append(parsedFields, ParsedField{
-					Name: field.Names[0].Name,
-					Type: fmt.Sprintf("%v.%s", fieldType.X, fieldType.Sel.Name),
-					NestedStruct: &ParsedStruct{
-						StructName:   fieldType.Sel.Name,
-						StructModule: fmt.Sprintf("%v", fieldType.X),
-					},
-				})
+				//FIND FIELD NESTED STRUCT  IN THIS PROJECT
+				structures, err := s.findFileByNameImport(fmt.Sprintf("%v", fieldType.X))
+				if err != nil {
+					colorPrint.PrintError(err)
+
+				}
+
+				structs := s.findStructByName(structures, fieldType.Sel.Name)
+				if len(structs) > 0 {
+					parsedFields = append(parsedFields, ParsedField{
+						Name: fmt.Sprintf("%v.%s", fieldType.X, fieldType.Sel.Name),
+						Type: "struct",
+						NestedStruct: &ParsedStruct{
+							StructName:   fieldType.Sel.Name,
+							StructModule: fmt.Sprintf("%v", fieldType.X),
+							FileName:     structs[0].FileName,
+							Fields:       structs[0].Fields,
+						},
+					})
+				}
 			}
 		case *ast.StarExpr:
 			// If the field type is a pointer to another type
