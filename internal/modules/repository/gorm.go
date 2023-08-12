@@ -1,6 +1,7 @@
 package repository_module
 
 import (
+	"fmt"
 	"github.com/go-codegen/go-codegen/internal/constants"
 	filesys_core "github.com/go-codegen/go-codegen/internal/filesys/core"
 	"github.com/go-codegen/go-codegen/internal/parse"
@@ -32,6 +33,14 @@ func (g *Gorm) MethodsData(info parse.ParsedStruct) repository.Methods {
 	methods.Funcs = append(methods.Funcs, g.find(info))
 
 	findFuncs := g.findByAllFields(info)
+
+	fmt.Println(info)
+	for _, f := range info.Fields {
+		if f.NestedStruct != nil {
+			fmt.Println("nested struct")
+			fmt.Println(f.NestedStruct)
+		}
+	}
 
 	for _, f := range findFuncs {
 		methods.Funcs = append(methods.Funcs, f)

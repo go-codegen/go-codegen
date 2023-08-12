@@ -82,7 +82,7 @@ func (r *Repository) CreateRepositoryMethods(s parse.ParsedStruct) filesys_core.
 //
 //	entityData := r.Module.EntityData(s)
 //
-//	structBody.Name = r.File.CreateFileNameByStructName(s.Name, "entity-", "")
+//	structBody.Name = r.Dir.CreateFileNameByStructName(s.Name, "entity-", "")
 //
 //	structBody.Package = s.Name + string(constants.Suffix)
 //

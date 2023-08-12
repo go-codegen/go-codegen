@@ -22,10 +22,15 @@ type ParsedField struct {
 }
 
 type ParsedStruct struct {
-	StructName   string
-	StructModule string
-	FileName     string
-	Fields       []ParsedField
+	StructName    string
+	StructModule  string
+	PathToPackage string
+	Fields        []ParsedField
+}
+
+type Dir struct {
+	DirName string
+	File    *ast.File
 }
 
 type StructImpl struct {
@@ -45,7 +50,7 @@ func (s *StructImpl) parseFile(filename string) (*ast.File, error) {
 }
 
 // parse dir
-func (s *StructImpl) parseDir(path string) ([]*ast.File, error) {
+func (s *StructImpl) parseDir(path string) ([]Dir, error) {
 
 	//parse last part of path
 	parts := strings.Split(path, "/")
@@ -61,7 +66,7 @@ func (s *StructImpl) parseDir(path string) ([]*ast.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	var files []*ast.File
+	var files []Dir
 	for _, file := range fInDir {
 		if strings.Contains(file.Name(), lastPart) {
 			newPath := pathWithoutLastPart + file.Name()
@@ -72,7 +77,10 @@ func (s *StructImpl) parseDir(path string) ([]*ast.File, error) {
 			}
 			for _, pkg := range pkgs {
 				for _, f := range pkg.Files {
-					files = append(files, f)
+					files = append(files, Dir{
+						DirName: newPath,
+						File:    f,
+					})
 				}
 			}
 		}
@@ -120,7 +128,7 @@ func (s *StructImpl) findFileByNameImportOutSide(name string) ([][]ParsedStruct,
 			}
 			var parsedStructs [][]ParsedStruct
 			for _, f := range files {
-				parsedStructs = append(parsedStructs, s.parseStructs(f.Name.Name, f, true))
+				parsedStructs = append(parsedStructs, s.parseStructs(imp.Path.Value, f.File, true))
 			}
 
 			return parsedStructs, nil
@@ -177,7 +185,7 @@ func (s *StructImpl) findFileByNameImport(name string) ([][]ParsedStruct, error)
 								}
 
 								for _, f := range files {
-									parsedStructs = append(parsedStructs, s.parseStructs(f.Name.Name, f, true))
+									parsedStructs = append(parsedStructs, s.parseStructs(imp.Path.Value, f.File, true))
 								}
 							}
 						}
@@ -190,7 +198,130 @@ func (s *StructImpl) findFileByNameImport(name string) ([][]ParsedStruct, error)
 	return parsedStructs, nil
 }
 
-func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool) []ParsedField {
+func (s *StructImpl) findGoMode(path string, packageName string) (*os.File, error) {
+
+	importPath := strings.Trim(path, "\"")
+	parts := strings.Split(importPath, "/")
+	lastPart := parts[len(parts)-1]
+
+	//если last part - file name
+	if strings.Contains(lastPart, ".") {
+		parts = parts[:len(parts)-1]
+		lastPart = parts[len(parts)-1]
+	}
+
+	if lastPart == packageName {
+
+		for i := len(parts); i >= 0; i-- {
+			pathToGoMod := strings.Join(parts[:i], "/") + "/go.mod"
+			//delete double //
+			pathToGoMod = strings.Replace(pathToGoMod, "//", "/", -1)
+
+			file, err := os.Open(pathToGoMod)
+			if err != nil {
+				continue
+			}
+
+			if file != nil {
+				return file, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("no file found")
+}
+
+func (s *StructImpl) findPackageNameByOsFile(file *os.File) (string, error) {
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, "module") {
+			parts := strings.Split(line, " ")
+			if len(parts) > 1 {
+				packageName := parts[1]
+				packageName = strings.Trim(packageName, "\"")
+				return packageName, nil
+			}
+		}
+	}
+	return "", nil
+}
+
+func (s *StructImpl) findCommonPrefixAndRemainders(path1 string, path2 string) string {
+	// Разделяем пути на отдельные части
+	parts1 := strings.Split(path1, "/")
+	parts2 := strings.Split(path2, "/")
+
+	// Определяем максимальное количество частей, которое нужно проверить
+	maxParts := len(parts1)
+	if len(parts2) < maxParts {
+		maxParts = len(parts2)
+	}
+
+	// Находим общий префикс
+	var commonParts []string
+	var remainder2 []string
+	for i := 0; i < maxParts; i++ {
+		if parts1[i] == parts2[i] {
+			commonParts = append(commonParts, parts1[i])
+		} else {
+			remainder2 = parts2[i:]
+			break
+		}
+	}
+
+	// Объединяем общие части обратно в строку
+	remainderPath := strings.Join(remainder2, "/")
+
+	return remainderPath
+}
+
+func (s *StructImpl) transformPathAndImport(pathArg string, importArg string) (string, error) {
+	globalPath, err := utils.GetGlobalPath()
+	if err != nil {
+		return "", err
+	}
+
+	remainder := s.findCommonPrefixAndRemainders(globalPath, pathArg)
+
+	// если last part remainer - file name
+	parts := strings.Split(remainder, "/")
+	lastPart := parts[len(parts)-1]
+	if strings.Contains(lastPart, ".") {
+		remainder = strings.Replace(remainder, lastPart, "", -1)
+		//	if last symbol is / - delete it
+		if strings.HasSuffix(remainder, "/") {
+			remainder = strings.TrimSuffix(remainder, "/")
+		}
+		return importArg + "/" + remainder, nil
+	}
+
+	return "", err
+}
+
+func (s *StructImpl) createPackagePath(filename string, name string) (string, error) {
+	findGoMod, err := s.findGoMode(filename, fmt.Sprintf("%v", name))
+	if err != nil {
+		colorPrint.PrintError(err)
+	}
+
+	findPackageName := filename
+
+	if findGoMod != nil {
+		findPackageName, err = s.findPackageNameByOsFile(findGoMod)
+		if err != nil {
+			colorPrint.PrintError(err)
+		}
+		findPackageName, err = s.transformPathAndImport(filename, findPackageName)
+		if err != nil {
+			colorPrint.PrintError(err)
+		}
+		return findPackageName, nil
+	}
+
+	return "", fmt.Errorf("no package name found")
+}
+
+func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool, filename string) []ParsedField {
 	var parsedFields []ParsedField
 	for _, field := range fields {
 		switch fieldType := field.Type.(type) {
@@ -203,7 +334,7 @@ func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool)
 				pstruct := ParsedStruct{StructName: fieldName}
 
 				// Parse and collect fields from the nested struct
-				pstruct.Fields = s.collectFields(fieldType.Fields.List, fromAnotherPackage)
+				pstruct.Fields = s.collectFields(fieldType.Fields.List, fromAnotherPackage, filename)
 
 				// Construct ParsedField with nested struct information
 				parsedField := ParsedField{
@@ -241,14 +372,15 @@ func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool)
 				}
 				structs := s.findStructByName(structures, fieldType.Sel.Name)
 				if len(structs) > 0 {
+
 					parsedFields = append(parsedFields, ParsedField{
 						Name: fmt.Sprintf("%v.%s", fieldType.X, fieldType.Sel.Name),
 						Type: "struct",
 						NestedStruct: &ParsedStruct{
-							StructName:   fieldType.Sel.Name,
-							StructModule: fmt.Sprintf("%v", fieldType.X),
-							FileName:     structs[0].FileName,
-							Fields:       structs[0].Fields,
+							StructName:    fieldType.Sel.Name,
+							StructModule:  fmt.Sprintf("%v", fieldType.X),
+							PathToPackage: structs[0].PathToPackage,
+							Fields:        structs[0].Fields,
 						},
 					})
 
@@ -280,10 +412,10 @@ func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool)
 						Name: fmt.Sprintf("%v.%s", fieldType.X, fieldType.Sel.Name),
 						Type: "struct",
 						NestedStruct: &ParsedStruct{
-							StructName:   fieldType.Sel.Name,
-							StructModule: fmt.Sprintf("%v", fieldType.X),
-							FileName:     structs[0].FileName,
-							Fields:       structs[0].Fields,
+							StructName:    fieldType.Sel.Name,
+							StructModule:  fmt.Sprintf("%v", fieldType.X),
+							PathToPackage: structs[0].PathToPackage,
+							Fields:        structs[0].Fields,
 						},
 					})
 				}
@@ -310,7 +442,7 @@ func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool)
 					log.Fatal("Not a *ast.StructType")
 				}
 
-				fields := s.collectFields(astStruct.Fields.List, fromAnotherPackage)
+				fields := s.collectFields(astStruct.Fields.List, fromAnotherPackage, filename)
 				var name string
 				if len(field.Names) > 0 {
 					name = field.Names[0].Name
@@ -318,12 +450,23 @@ func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool)
 					name = fieldType.Name
 				}
 
+				//TODO: нужно взять путь , затем переделать под путь к пакету
+				//нужно взять абсолютный путь к файлу, затем взять путь к пакету и сделать путь импорта к пакету
+
+				findPackageName, err := s.createPackagePath(filename, s.f.Name.Name)
+				if err != nil {
+					colorPrint.PrintError(err)
+					findPackageName = filename
+				}
+
 				parsedFields = append(parsedFields, ParsedField{
 					Name: name,
 					Type: "struct",
 					NestedStruct: &ParsedStruct{
-						StructName: fieldType.Name,
-						Fields:     fields,
+						StructName:    fieldType.Name,
+						StructModule:  s.f.Name.Name,
+						PathToPackage: findPackageName,
+						Fields:        fields,
 					},
 				})
 				continue
@@ -361,9 +504,14 @@ func (s *StructImpl) processSpecs(decl *ast.GenDecl, filename string, fromAnothe
 		if !ok {
 			continue
 		}
-		fields := s.collectFields(structType.Fields.List, fromAnotherPackage)
+		fields := s.collectFields(structType.Fields.List, fromAnotherPackage, filename)
 
-		structs = append(structs, ParsedStruct{FileName: filename, StructName: typeSpec.Name.Name, Fields: fields, StructModule: s.f.Name.Name})
+		findPackageName, err := s.createPackagePath(filename, s.f.Name.Name)
+		if err != nil {
+			findPackageName = filename
+		}
+
+		structs = append(structs, ParsedStruct{PathToPackage: findPackageName, StructName: typeSpec.Name.Name, Fields: fields, StructModule: s.f.Name.Name})
 	}
 	return structs
 }
