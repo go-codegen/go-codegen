@@ -10,10 +10,16 @@ type HelloRepository struct {
 }
 
 type HelloRepositoryImpl interface {
+	NewHelloRepository(db *gorm.DB) (*HelloRepository)
 	Create(h *test.Hello) (*test.Hello, error)
 	FindByID(id string) (*test.Hello, error)
 	Update(h *test.Hello) (*test.Hello, error)
 	Delete(id string) (error)
+}
+func NewHelloRepository(db *gorm.DB) *HelloRepository {
+	return &HelloRepository{
+		db: db,	
+	}
 }
 func (r *HelloRepository) Create(h *test.Hello) (*test.Hello, error) {
 	if err := r.db.Create(&h).Error; err != nil {

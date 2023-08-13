@@ -30,6 +30,7 @@ func (g *Gorm) MethodsData(info parse.ParsedStruct) repository.Methods {
 	g.addImportFromField(info.PathToPackage)
 	methods.Struct = g.createRepositoryStruct(info.StructName + string(g.suffix))
 
+	methods.Funcs = append(methods.Funcs, g.createFuncNewRepositoryStruct(info.StructName))
 	methods.Funcs = append(methods.Funcs, g.create(info))
 	methods.Funcs = append(methods.Funcs, g.find(info))
 
@@ -53,7 +54,7 @@ func (g *Gorm) MethodsData(info parse.ParsedStruct) repository.Methods {
 	methods.Imports = g.imports
 
 	for _, f := range methods.Funcs {
-		methods.Interface.Name = info.StructName + string(g.suffix) + "Impl"
+		methods.Interface.Name = info.StructName + g.suffix + "Impl"
 
 		args := strings.Join(f.Ars, ", ")
 		returnValues := strings.Join(f.ReturnValues, ", ")
@@ -65,6 +66,23 @@ func (g *Gorm) MethodsData(info parse.ParsedStruct) repository.Methods {
 
 	return methods
 
+}
+
+//func NewRepositoryTestRepository(db *gorm.DB) *RepositoryTestRepository {
+//	return &RepositoryTestRepository{
+//		db: db,
+//	}
+//}
+
+func (g *Gorm) createFuncNewRepositoryStruct(name string) filesys_core.FuncBody {
+	var funcBody filesys_core.FuncBody
+
+	funcBody.Name = "New" + name + g.suffix
+	funcBody.Ars = append(funcBody.Ars, "db *gorm.DB")
+	funcBody.ReturnValues = append(funcBody.ReturnValues, "*"+name+g.suffix)
+	funcBody.Body = "return &" + name + g.suffix + "{\n\t\tdb: db,\t\n\t}"
+
+	return funcBody
 }
 
 func (g *Gorm) addImportFromField(imp string) {
@@ -123,7 +141,7 @@ func (g *Gorm) delete(info parse.ParsedStruct) filesys_core.FuncBody {
 	entityName := info.StructModule + "." + info.StructName
 
 	function.StructSymbol = g.structSymbol
-	function.StructName = info.StructName + string(g.suffix)
+	function.StructName = info.StructName + g.suffix
 	function.Ars = append(function.Ars, "id string")
 	function.ReturnValues = append(function.ReturnValues, "error")
 
@@ -223,7 +241,7 @@ func (g *Gorm) findOne(f parse.ParsedField, packageName, name string) filesys_co
 
 	function.Name = "FindBy" + f.Name
 	function.StructSymbol = "r"
-	function.StructName = name + string(g.suffix)
+	function.StructName = name + g.suffix
 	function.Ars = append(function.Ars, f.Name+" "+f.Type)
 	function.ReturnValues = append(function.ReturnValues, "*"+entityName, "error")
 

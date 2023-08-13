@@ -10,6 +10,7 @@ type RepositoryTestRepository struct {
 }
 
 type RepositoryTestRepositoryImpl interface {
+	NewRepositoryTestRepository(db *gorm.DB) *RepositoryTestRepository
 	Create(r1 *test.RepositoryTest) (*test.RepositoryTest, error)
 	FindByID(id string) (*test.RepositoryTest, error)
 	FindByHelloID(HelloID int) ([]*test.RepositoryTest, error)
@@ -19,6 +20,11 @@ type RepositoryTestRepositoryImpl interface {
 	Delete(id string) error
 }
 
+func NewRepositoryTestRepository(db *gorm.DB) *RepositoryTestRepository {
+	return &RepositoryTestRepository{
+		db: db,
+	}
+}
 func (r *RepositoryTestRepository) Create(r1 *test.RepositoryTest) (*test.RepositoryTest, error) {
 	if err := r.db.Create(&r1).Error; err != nil {
 		return nil, err
