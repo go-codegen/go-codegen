@@ -25,6 +25,7 @@ func NewRepositoryTestRepository(db *gorm.DB) *RepositoryTestRepository {
 		db: db,
 	}
 }
+
 func (r *RepositoryTestRepository) Create(r1 *test.RepositoryTest) (*test.RepositoryTest, error) {
 	if err := r.db.Create(&r1).Error; err != nil {
 		return nil, err
@@ -32,6 +33,7 @@ func (r *RepositoryTestRepository) Create(r1 *test.RepositoryTest) (*test.Reposi
 
 	return r1, nil
 }
+
 func (r *RepositoryTestRepository) FindByID(id string) (*test.RepositoryTest, error) {
 	var r1 test.RepositoryTest
 
@@ -41,6 +43,7 @@ func (r *RepositoryTestRepository) FindByID(id string) (*test.RepositoryTest, er
 
 	return &r1, nil
 }
+
 func (r *RepositoryTestRepository) FindByHelloID(HelloID int) ([]*test.RepositoryTest, error) {
 	var r1 []*test.RepositoryTest
 
@@ -50,6 +53,7 @@ func (r *RepositoryTestRepository) FindByHelloID(HelloID int) ([]*test.Repositor
 
 	return r1, nil
 }
+
 func (r *RepositoryTestRepository) FindByNameAction(NameAction string) ([]*test.RepositoryTest, error) {
 	var r1 []*test.RepositoryTest
 
@@ -59,6 +63,7 @@ func (r *RepositoryTestRepository) FindByNameAction(NameAction string) ([]*test.
 
 	return r1, nil
 }
+
 func (r *RepositoryTestRepository) FindByAge(Age int) (*test.RepositoryTest, error) {
 	var r1 test.RepositoryTest
 
@@ -68,6 +73,7 @@ func (r *RepositoryTestRepository) FindByAge(Age int) (*test.RepositoryTest, err
 
 	return &r1, nil
 }
+
 func (r *RepositoryTestRepository) Update(r1 *test.RepositoryTest) (*test.RepositoryTest, error) {
 	if err := r.db.Save(&r1).Error; err != nil {
 		return nil, err
@@ -75,6 +81,7 @@ func (r *RepositoryTestRepository) Update(r1 *test.RepositoryTest) (*test.Reposi
 
 	return r1, nil
 }
+
 func (r *RepositoryTestRepository) Delete(id string) error {
 	if err := r.db.Delete(&test.RepositoryTest{}, "id = ?", id).Error; err != nil {
 		return err
