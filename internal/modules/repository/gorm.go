@@ -52,6 +52,17 @@ func (g *Gorm) MethodsData(info parse.ParsedStruct) repository.Methods {
 
 	methods.Imports = g.imports
 
+	for _, f := range methods.Funcs {
+		methods.Interface.Name = info.StructName + string(g.suffix) + "Impl"
+
+		args := strings.Join(f.Ars, ", ")
+		returnValues := strings.Join(f.ReturnValues, ", ")
+
+		stringFunc := f.Name + "(" + args + ") (" + returnValues + ")"
+
+		methods.Interface.Fields = append(methods.Interface.Fields, stringFunc)
+	}
+
 	return methods
 
 }
