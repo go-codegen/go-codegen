@@ -1,19 +1,12 @@
 package repository
 
 import (
-	"github.com/go-codegen/go-codegen/test"
 	"gorm.io/gorm"
+	"github.com/go-codegen/go-codegen/test"
 )
 
 type HelloRepository struct {
 	db *gorm.DB
-}
-
-type HelloRepositoryImpl interface {
-	Create(h *test.Hello) (*test.Hello, error)
-	FindByID(id string) (*test.Hello, error)
-	Update(h *test.Hello) (*test.Hello, error)
-	Delete(id string) error
 }
 
 func (r *HelloRepository) Create(h *test.Hello) (*test.Hello, error) {
@@ -40,7 +33,7 @@ func (r *HelloRepository) Update(h *test.Hello) (*test.Hello, error) {
 	return h, nil
 }
 func (r *HelloRepository) Delete(id string) error {
-	if err := r.db.Delete(&test.Hello{}, "id = ?", id).Error; err != nil {
+	if err := r.db.Delete(&test.Hello{},"id = ?", id).Error; err != nil {
 		return err
 	}
 

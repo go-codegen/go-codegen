@@ -1,6 +1,9 @@
 package repository
 
-import "gorm.io/gorm"
+import (
+	"gorm.io/gorm"
+	"github.com/go-codegen/go-codegen/test"
+)
 
 type RepositoryTestRepository struct {
 	db *gorm.DB
@@ -49,14 +52,14 @@ func (r *RepositoryTestRepository) FindByNameAction(NameAction string) ([]*test.
 
 	return r1, nil
 }
-func (r *RepositoryTestRepository) FindByAge(Age int) ([]*test.RepositoryTest, error) {
-	var r1 []*test.RepositoryTest
+func (r *RepositoryTestRepository) FindByAge(Age int) (*test.RepositoryTest, error) {
+	var r1 test.RepositoryTest
 
-	if err := r.db.Where("age = ?", Age).Find(&r1).Error; err != nil {
+	if err := r.db.Where("age = ?", Age).First(&r1).Error; err != nil {
 		return nil, err
 	}
 
-	return r1, nil
+	return &r1, nil
 }
 func (r *RepositoryTestRepository) Update(r1 *test.RepositoryTest) (*test.RepositoryTest, error) {
 	if err := r.db.Save(&r1).Error; err != nil {

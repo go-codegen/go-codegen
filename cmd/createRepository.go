@@ -20,7 +20,7 @@ var createRepositoryCmd = &cobra.Command{
 and usage of using your command. For example:
  
 Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
+This application is a tool to generate the needed xz
 to quickly create a Cobra application.`,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -46,18 +46,19 @@ to quickly create a Cobra application.`,
 		switch args[0] {
 		case "gorm":
 			done := make(chan bool)
-			go utils.showLoadingAnimation(done)
+			go utils.ShowLoadingAnimation(done)
 
 			module := repository_module.NewGorm()
 
-			repo, err := parse.NewParse(path, "")
+			parseStruct := parse.NewStruct()
 
+			structs, err := parseStruct.ParseStructInFiles(path)
 			if err != nil {
 				colorPrint.PrintError(err)
 				return
 			}
 
-			body := repository.NewRepository(module, repo)
+			body := repository.NewRepository(module, structs)
 			err = body.Create(outPath)
 			if err != nil {
 				colorPrint.PrintError(err)
