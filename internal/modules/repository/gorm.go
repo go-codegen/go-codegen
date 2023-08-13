@@ -197,22 +197,15 @@ func (g *Gorm) findByAllFields(info parse.ParsedStruct) []filesys_core.FuncBody 
 			continue
 		}
 
-		unique := false
-		if f.Tags["gorm"] != nil {
-			if len(f.Tags["gorm"]) > 0 {
-				unique = utils.FindTag("unique", f.Tags["gorm"])
-			}
-		}
-		if f.Tags[string(constants.MainTag)] != nil {
-			if len(f.Tags[string(constants.MainTag)]) > 0 {
-				unique = utils.FindTag("unique", f.Tags[string(constants.MainTag)])
-			}
-		}
-
 		if f.Type == "struct" {
 			continue
 		}
 
+		if index := g.findTag(f.Tags, "index"); index {
+			continue
+		}
+
+		unique := g.findTag(f.Tags, "unique")
 		if unique {
 			//	find one
 			function = g.findOne(f, info.StructModule, info.StructName)
@@ -226,6 +219,22 @@ func (g *Gorm) findByAllFields(info parse.ParsedStruct) []filesys_core.FuncBody 
 	}
 
 	return functions
+}
+
+func (g *Gorm) findTag(tags map[string][]string, tag string) bool {
+	res := false
+	if tags["gorm"] != nil {
+		if len(tags["gorm"]) > 0 {
+			res = utils.FindTag(tag, tags["gorm"])
+		}
+	}
+	if tags[string(constants.MainTag)] != nil {
+		if len(tags[string(constants.MainTag)]) > 0 {
+			res = utils.FindTag(tag, tags[string(constants.MainTag)])
+		}
+	}
+
+	return res
 }
 
 // findBY func where field = ?

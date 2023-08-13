@@ -13,7 +13,6 @@ type RepositoryTestRepositoryImpl interface {
 	NewRepositoryTestRepository(db *gorm.DB) *RepositoryTestRepository
 	Create(r1 *test.RepositoryTest) (*test.RepositoryTest, error)
 	FindByID(id string) (*test.RepositoryTest, error)
-	FindByHelloID(HelloID int) ([]*test.RepositoryTest, error)
 	FindByNameAction(NameAction string) ([]*test.RepositoryTest, error)
 	FindByAge(Age int) (*test.RepositoryTest, error)
 	Update(r1 *test.RepositoryTest) (*test.RepositoryTest, error)
@@ -42,16 +41,6 @@ func (r *RepositoryTestRepository) FindByID(id string) (*test.RepositoryTest, er
 	}
 
 	return &r1, nil
-}
-
-func (r *RepositoryTestRepository) FindByHelloID(HelloID int) ([]*test.RepositoryTest, error) {
-	var r1 []*test.RepositoryTest
-
-	if err := r.db.Where("hello_id = ?", HelloID).Find(&r1).Error; err != nil {
-		return nil, err
-	}
-
-	return r1, nil
 }
 
 func (r *RepositoryTestRepository) FindByNameAction(NameAction string) ([]*test.RepositoryTest, error) {

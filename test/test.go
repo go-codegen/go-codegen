@@ -11,7 +11,7 @@ type Hello struct {
 
 type RepositoryTest struct {
 	gorm.Model
-	HelloID int
+	HelloID int `codegen:"index"`
 	Hello
 	WantHello  Hello
 	NameAction string `codegen:"id" gorm:"unique"`
