@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/go-codegen/go-codegen/internal/colorPrint"
+	"github.com/go-codegen/go-codegen/internal/constants"
 	"github.com/go-codegen/go-codegen/internal/utils"
 	"go/ast"
 	"go/parser"
@@ -339,7 +340,7 @@ func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool,
 				// Construct ParsedField with nested struct information
 				parsedField := ParsedField{
 					Name:         fieldName,
-					Type:         "struct",
+					Type:         string(constants.StructType),
 					NestedStruct: &pstruct,
 				}
 
@@ -375,7 +376,7 @@ func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool,
 
 					parsedFields = append(parsedFields, ParsedField{
 						Name: fmt.Sprintf("%v.%s", fieldType.X, fieldType.Sel.Name),
-						Type: "struct",
+						Type: string(constants.StructType),
 						NestedStruct: &ParsedStruct{
 							StructName:    fieldType.Sel.Name,
 							StructModule:  fmt.Sprintf("%v", fieldType.X),
@@ -392,7 +393,7 @@ func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool,
 			if fromAnotherPackage {
 				parsedFields = append(parsedFields, ParsedField{
 					Name: fmt.Sprintf("%v.%s", fieldType.X, fieldType.Sel.Name),
-					Type: "struct",
+					Type: string(constants.StructType),
 					NestedStruct: &ParsedStruct{
 						StructName:   fieldType.Sel.Name,
 						StructModule: fmt.Sprintf("%v", fieldType.X),
@@ -410,7 +411,7 @@ func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool,
 				if len(structs) > 0 {
 					parsedFields = append(parsedFields, ParsedField{
 						Name: fmt.Sprintf("%v.%s", fieldType.X, fieldType.Sel.Name),
-						Type: "struct",
+						Type: string(constants.StructType),
 						NestedStruct: &ParsedStruct{
 							StructName:    fieldType.Sel.Name,
 							StructModule:  fmt.Sprintf("%v", fieldType.X),
@@ -461,7 +462,7 @@ func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool,
 
 				parsedFields = append(parsedFields, ParsedField{
 					Name: name,
-					Type: "struct",
+					Type: string(constants.StructType),
 					NestedStruct: &ParsedStruct{
 						StructName:    fieldType.Name,
 						StructModule:  s.f.Name.Name,

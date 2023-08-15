@@ -13,6 +13,7 @@ type HelloRepositoryImpl interface {
 	NewHelloRepository(db *gorm.DB) (*HelloRepository)
 	Create(h *test.Hello) (*test.Hello, error)
 	FindByID(id string) (*test.Hello, error)
+	FindByData(Data string) ([]*test.Hello, error)
 	Update(h *test.Hello) (*test.Hello, error)
 	Delete(id string) (error)
 }
@@ -39,6 +40,16 @@ func (r *HelloRepository) FindByID(id string) (*test.Hello, error) {
 	}
 
 	return &h, nil
+}
+
+func (r *HelloRepository) FindByData(Data string) ([]*test.Hello, error) {
+	var h []*test.Hello
+
+	if err := r.db.Where("data = ?", Data).Find(&h).Error; err != nil {
+		return nil, err
+	}
+
+	return h, nil
 }
 
 func (r *HelloRepository) Update(h *test.Hello) (*test.Hello, error) {
