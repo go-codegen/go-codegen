@@ -284,14 +284,12 @@ func (g *Gorm) findByAllFieldsJoin(info parse.ParsedStruct) []filesys_core.FuncB
 	for _, f := range info.Fields {
 
 		checkField := strings.ToLower(f.Name)
-
 		if checkField == "id" || checkField == "gorm.model" || checkField == "createdat" || checkField == "updatedat" || checkField == "deletedat" {
 			continue
 		}
 		if f.Type != string(constants.StructType) {
 			continue
 		}
-		//fmt.Println(f)
 		findNestedField := g.findPrefixNameField(info.Fields, f.Name)
 		functions = append(functions, g.createJoinFunc(f, findNestedField, info.StructModule, info.StructName)...)
 	}
@@ -344,6 +342,27 @@ func (g *Gorm) joinFunc(field parse.ParsedField, nestedStruct *parse.ParsedStruc
 	}
 
 	nestedField := g.generateCombinations(nestedStruct.Fields)
+
+	//newNestedField := make([][]parse.ParsedField, 0) // for holding the new modified slice
+	//
+	//for _, f := range nestedField {
+	//	newF := make([]parse.ParsedField, 0) // for holding the new inner slice
+	//
+	//	for _, nf := range f {
+	//		if nf.Type != string(constants.StructType) {
+	//			newF = append(newF, nf)
+	//		}
+	//	}
+	//
+	//	// If nf.Type equals constants.StructType for all nf in f, newF will be empty.
+	//	// If you wish to preserve f even when empty, delete the next 'if len(newF) > 0'.
+	//	if len(newF) > 0 {
+	//		newNestedField = append(newNestedField, newF)
+	//	}
+	//}
+	//
+	//// assign the new (modified) slice back to nestedField
+	//nestedField = newNestedField
 
 	for _, f := range nestedField {
 		var function filesys_core.FuncBody
@@ -407,6 +426,7 @@ func (g *Gorm) generateCombinations(arr []parse.ParsedField) [][]parse.ParsedFie
 
 	n := len(arr)
 	for i := 1; i <= n; i++ {
+
 		g.generateCombination(arr, &combinations, []parse.ParsedField{}, 0, n, i)
 	}
 
@@ -420,7 +440,12 @@ func (g *Gorm) generateCombination(arr []parse.ParsedField, combinations *[][]pa
 	}
 
 	for i := start; i < end; i++ {
+		if arr[i].Type == string(constants.StructType) {
+			//	skip nested struct
+			continue
+		}
 		current = append(current, arr[i])
+
 		g.generateCombination(arr, combinations, current, i+1, end, size-1)
 		current = current[:len(current)-1]
 	}

@@ -14,13 +14,9 @@ func (i *Import) Create(imports []string) string {
 	}
 	if len(imports) > 1 {
 		importString = "import (\n"
-		for _, i := range imports {
-			//автоматически добавлять "" к импортам если их нет
-			if i[0] == '"' {
-				importString += "\t" + i + "\n"
-			} else {
-				importString += "\t\"" + i + "\"\n"
-			}
+		for _, imp := range imports {
+			//	//автоматически добавлять "" к импортам если их нет
+			importString += "\t\"" + imp + "\"\n"
 		}
 		importString += ")\n\n"
 	} else {

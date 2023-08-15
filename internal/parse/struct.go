@@ -51,7 +51,7 @@ func (s *StructImpl) parseFile(filename string) (*ast.File, error) {
 }
 
 // parse dir
-func (s *StructImpl) parseDir(path string) ([]Dir, error) {
+func (s *StructImpl) parseDirByNameFileAndPath(path string) ([]Dir, error) {
 
 	//parse last part of path
 	parts := strings.Split(path, "/")
@@ -61,7 +61,6 @@ func (s *StructImpl) parseDir(path string) ([]Dir, error) {
 	for i := 0; i < len(parts)-1; i++ {
 		pathWithoutLastPart += parts[i] + "/"
 	}
-
 	//find xz in path
 	fInDir, err := os.ReadDir(pathWithoutLastPart)
 	if err != nil {
@@ -83,6 +82,39 @@ func (s *StructImpl) parseDir(path string) ([]Dir, error) {
 						File:    f,
 					})
 				}
+			}
+		}
+	}
+	return files, nil
+}
+
+func (s *StructImpl) parseDir(pathToDir string) ([]Dir, error) {
+	//get last part of path
+
+	parts := strings.Split(pathToDir, "/")
+	lastPart := parts[len(parts)-1]
+	if strings.Contains(lastPart, ".") {
+		newPath := strings.Replace(pathToDir, lastPart, "", -1)
+		return s.parseDir(newPath)
+	}
+
+	fInDir, err := os.ReadDir(pathToDir)
+	if err != nil {
+		return nil, err
+	}
+	var files []Dir
+	for _, _ = range fInDir {
+		fset := token.NewFileSet()
+		pkgs, err := parser.ParseDir(fset, pathToDir, nil, parser.ParseComments)
+		if err != nil {
+			return nil, err
+		}
+		for _, pkg := range pkgs {
+			for _, f := range pkg.Files {
+				files = append(files, Dir{
+					DirName: lastPart,
+					File:    f,
+				})
 			}
 		}
 	}
@@ -123,7 +155,7 @@ func (s *StructImpl) findFileByNameImportOutSide(name string) ([][]ParsedStruct,
 			}
 			path := gopath + "/pkg/mod/" + imp.Path.Value
 			path = strings.Replace(path, "\\", "/", -1)
-			files, err := s.parseDir(path)
+			files, err := s.parseDirByNameFileAndPath(path)
 			if err != nil {
 				return nil, err
 			}
@@ -152,7 +184,6 @@ func (s *StructImpl) findFileByNameImport(name string) ([][]ParsedStruct, error)
 		importPath := strings.Trim(imp.Path.Value, "\"")
 		parts := strings.Split(importPath, "/")
 		lastPart := parts[len(parts)-1]
-
 		if lastPart == name {
 
 			for i := len(parts); i >= 0; i-- {
@@ -180,7 +211,7 @@ func (s *StructImpl) findFileByNameImport(name string) ([][]ParsedStruct, error)
 								newPath = newPath + newImportPath
 
 								//	parse dir
-								files, err := s.parseDir(newPath)
+								files, err := s.parseDirByNameFileAndPath(newPath)
 								if err != nil {
 									return nil, err
 								}
@@ -404,7 +435,6 @@ func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool,
 				structures, err := s.findFileByNameImport(fmt.Sprintf("%v", fieldType.X))
 				if err != nil {
 					colorPrint.PrintError(err)
-
 				}
 
 				structs := s.findStructByName(structures, fieldType.Sel.Name)
@@ -459,7 +489,6 @@ func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool,
 					colorPrint.PrintError(err)
 					findPackageName = filename
 				}
-
 				parsedFields = append(parsedFields, ParsedField{
 					Name: name,
 					Type: string(constants.StructType),
@@ -473,6 +502,36 @@ func (s *StructImpl) collectFields(fields []*ast.Field, fromAnotherPackage bool,
 				continue
 			}
 			// Assume this is a regular field, collect it ONLY if it has a name
+			if !fromAnotherPackage {
+				fieldType := fmt.Sprintf("%v", field.Type)
+				if fieldType != "string" && fieldType != "int" && fieldType != "int64" && fieldType != "float64" && fieldType != "bool" && fieldType != "time.Time" {
+					//FIND FIELD NESTED STRUCT  IN THIS FOLDER
+					//fmt.Println("filename", filename)
+					dir, err := s.parseDir(filename)
+					if err != nil {
+						continue
+					}
+					var parsedStructs [][]ParsedStruct
+					for _, f := range dir {
+						parsedStructs = append(parsedStructs, s.parseStructs(filename, f.File, true))
+					}
+					structs := s.findStructByName(parsedStructs, fieldType)
+					//fmt.Println("structs", structs)
+					if len(structs) > 0 {
+						parsedFields = append(parsedFields, ParsedField{
+							Name: fmt.Sprintf("%v", fieldType),
+							Type: string(constants.StructType),
+							NestedStruct: &ParsedStruct{
+								StructName:    fieldType,
+								StructModule:  fieldType,
+								PathToPackage: structs[0].PathToPackage,
+								Fields:        structs[0].Fields,
+							},
+						})
+					}
+					continue
+				}
+			}
 			if len(field.Names) > 0 {
 				tags := map[string][]string{}
 				if field.Tag != nil {

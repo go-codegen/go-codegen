@@ -3,6 +3,7 @@ package repository
 import (
 	"github.com/go-codegen/go-codegen/test"
 	"gorm.io/gorm"
+	"time"
 )
 
 type RepositoryTestRepository struct {
@@ -13,11 +14,18 @@ type RepositoryTestRepositoryImpl interface {
 	NewRepositoryTestRepository(db *gorm.DB) *RepositoryTestRepository
 	Create(r1 *test.RepositoryTest) (*test.RepositoryTest, error)
 	FindByID(id string) (*test.RepositoryTest, error)
-	FindByHelloID(ID int) ([]*test.RepositoryTest, error)
-	FindByHelloData(Data string) ([]*test.RepositoryTest, error)
-	FindByHelloIDAndData(ID int, Data string) ([]*test.RepositoryTest, error)
-	FindByNameAction(NameAction string) ([]*test.RepositoryTest, error)
-	FindByAge(Age int) (*test.RepositoryTest, error)
+	FindByUserName(Name string) ([]*test.RepositoryTest, error)
+	FindByUserEmail(Email string) ([]*test.RepositoryTest, error)
+	FindByUserPassword(Password string) ([]*test.RepositoryTest, error)
+	FindByUserNameAndEmail(Name string, Email string) ([]*test.RepositoryTest, error)
+	FindByUserNameAndPassword(Name string, Password string) ([]*test.RepositoryTest, error)
+	FindByUserEmailAndPassword(Email string, Password string) ([]*test.RepositoryTest, error)
+	FindByUserNameAndEmailAndPassword(Name string, Email string, Password string) ([]*test.RepositoryTest, error)
+	FindByAccessToken(AccessToken string) ([]*test.RepositoryTest, error)
+	FindByRefreshToken(RefreshToken string) ([]*test.RepositoryTest, error)
+	FindByExpiresAt(ExpiresAt time.Time) ([]*test.RepositoryTest, error)
+	FindByUserID(UserID int) ([]*test.RepositoryTest, error)
+	FindByIP(IP string) ([]*test.RepositoryTest, error)
 	Update(r1 *test.RepositoryTest) (*test.RepositoryTest, error)
 	Delete(id string) error
 }
@@ -46,13 +54,13 @@ func (r *RepositoryTestRepository) FindByID(id string) (*test.RepositoryTest, er
 	return &r1, nil
 }
 
-func (r *RepositoryTestRepository) FindByHelloID(ID int) ([]*test.RepositoryTest, error) {
+func (r *RepositoryTestRepository) FindByUserName(Name string) ([]*test.RepositoryTest, error) {
 	var r1 []*test.RepositoryTest
 
 	if err := r.db.Table("repository_tests").
 		Select("repository_tests.*").
-		Joins("JOIN hellos ON hellos.id = repository_tests.hello_id").
-		Where("hellos.id = ?", ID).
+		Joins("JOIN users ON users.id = repository_tests.user_id").
+		Where("users.name = ?", Name).
 		Find(&r1).Error; err != nil {
 		return nil, err
 	}
@@ -60,13 +68,13 @@ func (r *RepositoryTestRepository) FindByHelloID(ID int) ([]*test.RepositoryTest
 	return r1, nil
 }
 
-func (r *RepositoryTestRepository) FindByHelloData(Data string) ([]*test.RepositoryTest, error) {
+func (r *RepositoryTestRepository) FindByUserEmail(Email string) ([]*test.RepositoryTest, error) {
 	var r1 []*test.RepositoryTest
 
 	if err := r.db.Table("repository_tests").
 		Select("repository_tests.*").
-		Joins("JOIN hellos ON hellos.id = repository_tests.hello_id").
-		Where("hellos.data = ?", Data).
+		Joins("JOIN users ON users.id = repository_tests.user_id").
+		Where("users.email = ?", Email).
 		Find(&r1).Error; err != nil {
 		return nil, err
 	}
@@ -74,13 +82,13 @@ func (r *RepositoryTestRepository) FindByHelloData(Data string) ([]*test.Reposit
 	return r1, nil
 }
 
-func (r *RepositoryTestRepository) FindByHelloIDAndData(ID int, Data string) ([]*test.RepositoryTest, error) {
+func (r *RepositoryTestRepository) FindByUserPassword(Password string) ([]*test.RepositoryTest, error) {
 	var r1 []*test.RepositoryTest
 
 	if err := r.db.Table("repository_tests").
 		Select("repository_tests.*").
-		Joins("JOIN hellos ON hellos.id = repository_tests.hello_id").
-		Where("hellos.id = ? AND hellos.data = ?", ID, Data).
+		Joins("JOIN users ON users.id = repository_tests.user_id").
+		Where("users.password = ?", Password).
 		Find(&r1).Error; err != nil {
 		return nil, err
 	}
@@ -88,24 +96,110 @@ func (r *RepositoryTestRepository) FindByHelloIDAndData(ID int, Data string) ([]
 	return r1, nil
 }
 
-func (r *RepositoryTestRepository) FindByNameAction(NameAction string) ([]*test.RepositoryTest, error) {
+func (r *RepositoryTestRepository) FindByUserNameAndEmail(Name string, Email string) ([]*test.RepositoryTest, error) {
 	var r1 []*test.RepositoryTest
 
-	if err := r.db.Where("name_action = ?", NameAction).Find(&r1).Error; err != nil {
+	if err := r.db.Table("repository_tests").
+		Select("repository_tests.*").
+		Joins("JOIN users ON users.id = repository_tests.user_id").
+		Where("users.name = ? AND users.email = ?", Name, Email).
+		Find(&r1).Error; err != nil {
 		return nil, err
 	}
 
 	return r1, nil
 }
 
-func (r *RepositoryTestRepository) FindByAge(Age int) (*test.RepositoryTest, error) {
-	var r1 test.RepositoryTest
+func (r *RepositoryTestRepository) FindByUserNameAndPassword(Name string, Password string) ([]*test.RepositoryTest, error) {
+	var r1 []*test.RepositoryTest
 
-	if err := r.db.Where("age = ?", Age).First(&r1).Error; err != nil {
+	if err := r.db.Table("repository_tests").
+		Select("repository_tests.*").
+		Joins("JOIN users ON users.id = repository_tests.user_id").
+		Where("users.name = ? AND users.password = ?", Name, Password).
+		Find(&r1).Error; err != nil {
 		return nil, err
 	}
 
-	return &r1, nil
+	return r1, nil
+}
+
+func (r *RepositoryTestRepository) FindByUserEmailAndPassword(Email string, Password string) ([]*test.RepositoryTest, error) {
+	var r1 []*test.RepositoryTest
+
+	if err := r.db.Table("repository_tests").
+		Select("repository_tests.*").
+		Joins("JOIN users ON users.id = repository_tests.user_id").
+		Where("users.email = ? AND users.password = ?", Email, Password).
+		Find(&r1).Error; err != nil {
+		return nil, err
+	}
+
+	return r1, nil
+}
+
+func (r *RepositoryTestRepository) FindByUserNameAndEmailAndPassword(Name string, Email string, Password string) ([]*test.RepositoryTest, error) {
+	var r1 []*test.RepositoryTest
+
+	if err := r.db.Table("repository_tests").
+		Select("repository_tests.*").
+		Joins("JOIN users ON users.id = repository_tests.user_id").
+		Where("users.name = ? AND users.email = ? AND users.password = ?", Name, Email, Password).
+		Find(&r1).Error; err != nil {
+		return nil, err
+	}
+
+	return r1, nil
+}
+
+func (r *RepositoryTestRepository) FindByAccessToken(AccessToken string) ([]*test.RepositoryTest, error) {
+	var r1 []*test.RepositoryTest
+
+	if err := r.db.Where("access_token = ?", AccessToken).Find(&r1).Error; err != nil {
+		return nil, err
+	}
+
+	return r1, nil
+}
+
+func (r *RepositoryTestRepository) FindByRefreshToken(RefreshToken string) ([]*test.RepositoryTest, error) {
+	var r1 []*test.RepositoryTest
+
+	if err := r.db.Where("refresh_token = ?", RefreshToken).Find(&r1).Error; err != nil {
+		return nil, err
+	}
+
+	return r1, nil
+}
+
+func (r *RepositoryTestRepository) FindByExpiresAt(ExpiresAt time.Time) ([]*test.RepositoryTest, error) {
+	var r1 []*test.RepositoryTest
+
+	if err := r.db.Where("expires_at = ?", ExpiresAt).Find(&r1).Error; err != nil {
+		return nil, err
+	}
+
+	return r1, nil
+}
+
+func (r *RepositoryTestRepository) FindByUserID(UserID int) ([]*test.RepositoryTest, error) {
+	var r1 []*test.RepositoryTest
+
+	if err := r.db.Where("user_id = ?", UserID).Find(&r1).Error; err != nil {
+		return nil, err
+	}
+
+	return r1, nil
+}
+
+func (r *RepositoryTestRepository) FindByIP(IP string) ([]*test.RepositoryTest, error) {
+	var r1 []*test.RepositoryTest
+
+	if err := r.db.Where("ip = ?", IP).Find(&r1).Error; err != nil {
+		return nil, err
+	}
+
+	return r1, nil
 }
 
 func (r *RepositoryTestRepository) Update(r1 *test.RepositoryTest) (*test.RepositoryTest, error) {
