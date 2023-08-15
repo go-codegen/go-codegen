@@ -1,13 +1,17 @@
 package test
 
-import "gorm.io/gorm"
+import (
+	"gorm.io/gorm"
+)
 
 type Hello struct {
-	ID int
+	ID   int
+	Data string
 }
+
 type RepositoryTest struct {
 	gorm.Model
-	HelloID int
+	HelloID int `codegen:"index"`
 	Hello
 	NameAction string `codegen:"id" gorm:"unique"`
 	Age        int    `codegen:"id,unique" json:"age" xml:"age"`

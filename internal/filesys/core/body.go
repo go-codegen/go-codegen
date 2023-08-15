@@ -38,14 +38,17 @@ func (b *Body) Create(body FileBody) string {
 
 	for _, s := range body.Structs {
 		fileBody += b.structs.Create(s)
+		fileBody += "\n"
 	}
 
 	for _, i := range body.Interfaces {
 		fileBody += b.interfaces.Create(i)
+		fileBody += "\n"
 	}
 
 	for _, fucns := range body.Funcs {
 		fileBody += b.function.Create(fucns)
+		fileBody += "\n"
 	}
 
 	return fileBody

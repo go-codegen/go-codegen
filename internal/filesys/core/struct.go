@@ -34,8 +34,6 @@ func (s *Struct) Create(body StructBody) string {
 
 	structString += "}\n"
 
-	structString += "\n"
-
 	for _, funcs := range body.Funcs {
 		funcStruct := &FuncBody{
 			StructSymbol: strings.ToLower(body.Name[0:1]),
