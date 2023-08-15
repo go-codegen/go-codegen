@@ -17,7 +17,7 @@ type Gorm struct {
 
 func NewGorm() *Gorm {
 	return &Gorm{
-		suffix:       string(constants.Suffix),
+		suffix:       string(constants.Suffix) + "Impl",
 		structSymbol: string(constants.StructSymbol),
 	}
 }
@@ -27,7 +27,7 @@ func (g *Gorm) MethodsData(info parse.ParsedStruct) repository.Methods {
 
 	g.addImportFromField("gorm.io/gorm")
 	g.addImportFromField(info.PathToPackage)
-	methods.Struct = g.createRepositoryStruct(info.StructName + string(g.suffix))
+	methods.Struct = g.createRepositoryStruct(info.StructName + g.suffix)
 
 	methods.Funcs = append(methods.Funcs, g.createFuncNewRepositoryStruct(info.StructName))
 	methods.Funcs = append(methods.Funcs, g.create(info))
@@ -46,7 +46,9 @@ func (g *Gorm) MethodsData(info parse.ParsedStruct) repository.Methods {
 	methods.Imports = g.imports
 
 	for _, f := range methods.Funcs {
-		methods.Interface.Name = info.StructName + g.suffix + "Impl"
+		//delete Impl from g.suffix
+		newSuffix := strings.ReplaceAll(g.suffix, "Impl", "")
+		methods.Interface.Name = info.StructName + newSuffix
 
 		args := strings.Join(f.Ars, ", ")
 		returnValues := strings.Join(f.ReturnValues, ", ")
