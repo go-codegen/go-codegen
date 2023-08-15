@@ -10,11 +10,20 @@ type HelloRepository struct {
 }
 
 type HelloRepositoryImpl interface {
+	NewHelloRepository(db *gorm.DB) (*HelloRepository)
 	Create(h *test.Hello) (*test.Hello, error)
 	FindByID(id string) (*test.Hello, error)
+	FindByData(Data string) ([]*test.Hello, error)
 	Update(h *test.Hello) (*test.Hello, error)
 	Delete(id string) (error)
 }
+
+func NewHelloRepository(db *gorm.DB) *HelloRepository {
+	return &HelloRepository{
+		db: db,	
+	}
+}
+
 func (r *HelloRepository) Create(h *test.Hello) (*test.Hello, error) {
 	if err := r.db.Create(&h).Error; err != nil {
 		return nil, err
@@ -22,6 +31,7 @@ func (r *HelloRepository) Create(h *test.Hello) (*test.Hello, error) {
 
 	return h, nil
 }
+
 func (r *HelloRepository) FindByID(id string) (*test.Hello, error) {
 	var h test.Hello
 
@@ -31,6 +41,17 @@ func (r *HelloRepository) FindByID(id string) (*test.Hello, error) {
 
 	return &h, nil
 }
+
+func (r *HelloRepository) FindByData(Data string) ([]*test.Hello, error) {
+	var h []*test.Hello
+
+	if err := r.db.Where("data = ?", Data).Find(&h).Error; err != nil {
+		return nil, err
+	}
+
+	return h, nil
+}
+
 func (r *HelloRepository) Update(h *test.Hello) (*test.Hello, error) {
 	if err := r.db.Save(&h).Error; err != nil {
 		return nil, err
@@ -38,6 +59,7 @@ func (r *HelloRepository) Update(h *test.Hello) (*test.Hello, error) {
 
 	return h, nil
 }
+
 func (r *HelloRepository) Delete(id string) error {
 	if err := r.db.Delete(&test.Hello{},"id = ?", id).Error; err != nil {
 		return err
@@ -45,3 +67,4 @@ func (r *HelloRepository) Delete(id string) error {
 
 	return nil
 }
+

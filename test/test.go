@@ -1,20 +1,18 @@
 package test
 
 import (
-	"github.com/go-codegen/go-codegen/test/xz"
 	"gorm.io/gorm"
 )
 
 type Hello struct {
-	ID int
+	ID   int
+	Data string
 }
 
 type RepositoryTest struct {
 	gorm.Model
-	HelloID int
+	HelloID int `codegen:"index"`
 	Hello
-	WantHello  Hello
 	NameAction string `codegen:"id" gorm:"unique"`
 	Age        int    `codegen:"id,unique" json:"age" xml:"age"`
-	Lol        xz.WhatThatIsFuck
 }
