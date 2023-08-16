@@ -46,7 +46,10 @@ func (g *Gorm) MethodsData(info parse.ParsedStruct) repository.Methods {
 	methods.Imports = g.imports
 
 	for _, f := range methods.Funcs {
-		//delete Impl from g.suffix
+		if f.Name == "New"+info.StructName+g.suffix {
+			continue
+		}
+
 		newSuffix := strings.ReplaceAll(g.suffix, "Impl", "")
 		methods.Interface.Name = info.StructName + newSuffix
 
@@ -239,7 +242,14 @@ func (g *Gorm) findOne(f parse.ParsedField, packageName, name string) filesys_co
 	variableName := g.getVariableName(name)
 
 	if f.NestedStruct != nil {
-		g.addImportFromField(f.NestedStruct.PathToPackage)
+		if f.NestedStruct.PathToPackage != "" {
+			g.addImportFromField(f.NestedStruct.PathToPackage)
+		}
+	}
+
+	//if f.Type is not a standart type, then add import
+	if f.Type == "time.Time" {
+		g.addImportFromField("time")
 	}
 
 	function.Name = "FindBy" + f.Name
@@ -263,8 +273,16 @@ func (g *Gorm) findMany(f parse.ParsedField, packageName, name string) filesys_c
 	entityName := packageName + "." + name
 	variableName := g.getVariableName(name)
 	if f.NestedStruct != nil {
-		g.addImportFromField(f.NestedStruct.PathToPackage)
+		if f.NestedStruct.PathToPackage != "" {
+			g.addImportFromField(f.NestedStruct.PathToPackage)
+		}
 	}
+
+	//if f.Type is not a standart type, then add import
+	if f.Type == "time.Time" {
+		g.addImportFromField("time")
+	}
+
 	function.Name = "FindBy" + f.Name
 	function.StructSymbol = "r"
 	function.StructName = name + string(g.suffix)

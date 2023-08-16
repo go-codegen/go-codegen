@@ -1,5 +1,5 @@
 package repository
-
+ 
 import (
 	"github.com/go-codegen/go-codegen/test"
 	"gorm.io/gorm"
@@ -11,7 +11,6 @@ type RepositoryTestRepositoryImpl struct {
 }
 
 type RepositoryTestRepository interface {
-	NewRepositoryTestRepositoryImpl(db *gorm.DB) *RepositoryTestRepositoryImpl
 	Create(r1 *test.RepositoryTest) (*test.RepositoryTest, error)
 	FindByID(id string) (*test.RepositoryTest, error)
 	FindByUserName(Name string) ([]*test.RepositoryTest, error)
@@ -59,7 +58,7 @@ func (r *RepositoryTestRepositoryImpl) FindByUserName(Name string) ([]*test.Repo
 
 	if err := r.db.Table("repository_tests").
 		Select("repository_tests.*").
-		Joins("JOIN users ON users.id = repository_tests.user_id").
+		Joins("JOIN users ON users.id = repository_tests.user").
 		Where("users.name = ?", Name).
 		Find(&r1).Error; err != nil {
 		return nil, err
@@ -73,7 +72,7 @@ func (r *RepositoryTestRepositoryImpl) FindByUserEmail(Email string) ([]*test.Re
 
 	if err := r.db.Table("repository_tests").
 		Select("repository_tests.*").
-		Joins("JOIN users ON users.id = repository_tests.user_id").
+		Joins("JOIN users ON users.id = repository_tests.user").
 		Where("users.email = ?", Email).
 		Find(&r1).Error; err != nil {
 		return nil, err
@@ -87,7 +86,7 @@ func (r *RepositoryTestRepositoryImpl) FindByUserPassword(Password string) ([]*t
 
 	if err := r.db.Table("repository_tests").
 		Select("repository_tests.*").
-		Joins("JOIN users ON users.id = repository_tests.user_id").
+		Joins("JOIN users ON users.id = repository_tests.user").
 		Where("users.password = ?", Password).
 		Find(&r1).Error; err != nil {
 		return nil, err
@@ -101,7 +100,7 @@ func (r *RepositoryTestRepositoryImpl) FindByUserNameAndEmail(Name string, Email
 
 	if err := r.db.Table("repository_tests").
 		Select("repository_tests.*").
-		Joins("JOIN users ON users.id = repository_tests.user_id").
+		Joins("JOIN users ON users.id = repository_tests.user").
 		Where("users.name = ? AND users.email = ?", Name, Email).
 		Find(&r1).Error; err != nil {
 		return nil, err
@@ -115,7 +114,7 @@ func (r *RepositoryTestRepositoryImpl) FindByUserNameAndPassword(Name string, Pa
 
 	if err := r.db.Table("repository_tests").
 		Select("repository_tests.*").
-		Joins("JOIN users ON users.id = repository_tests.user_id").
+		Joins("JOIN users ON users.id = repository_tests.user").
 		Where("users.name = ? AND users.password = ?", Name, Password).
 		Find(&r1).Error; err != nil {
 		return nil, err
@@ -129,7 +128,7 @@ func (r *RepositoryTestRepositoryImpl) FindByUserEmailAndPassword(Email string, 
 
 	if err := r.db.Table("repository_tests").
 		Select("repository_tests.*").
-		Joins("JOIN users ON users.id = repository_tests.user_id").
+		Joins("JOIN users ON users.id = repository_tests.user").
 		Where("users.email = ? AND users.password = ?", Email, Password).
 		Find(&r1).Error; err != nil {
 		return nil, err
@@ -143,7 +142,7 @@ func (r *RepositoryTestRepositoryImpl) FindByUserNameAndEmailAndPassword(Name st
 
 	if err := r.db.Table("repository_tests").
 		Select("repository_tests.*").
-		Joins("JOIN users ON users.id = repository_tests.user_id").
+		Joins("JOIN users ON users.id = repository_tests.user").
 		Where("users.name = ? AND users.email = ? AND users.password = ?", Name, Email, Password).
 		Find(&r1).Error; err != nil {
 		return nil, err
