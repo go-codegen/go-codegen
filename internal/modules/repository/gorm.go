@@ -32,13 +32,11 @@ func (g *Gorm) MethodsData(info parse.ParsedStruct) repository.Methods {
 	methods.Funcs = append(methods.Funcs, g.createFuncNewRepositoryStruct(info.StructName))
 	methods.Funcs = append(methods.Funcs, g.create(info))
 	methods.Funcs = append(methods.Funcs, g.find(info))
-	methods.Funcs = append(methods.Funcs, g.findByAllFieldsJoin(info)...)
-
 	findFuncs := g.findByAllFields(info)
-
 	for _, f := range findFuncs {
 		methods.Funcs = append(methods.Funcs, f)
 	}
+	methods.Funcs = append(methods.Funcs, g.findByAllFieldsJoin(info)...)
 
 	methods.Funcs = append(methods.Funcs, g.update(info))
 	methods.Funcs = append(methods.Funcs, g.delete(info))
@@ -185,34 +183,45 @@ func (g *Gorm) find(info parse.ParsedStruct) filesys_core.FuncBody {
 func (g *Gorm) findByAllFields(info parse.ParsedStruct) []filesys_core.FuncBody {
 	var functions []filesys_core.FuncBody
 
-	for _, f := range info.Fields {
-		var function filesys_core.FuncBody
+	combinations := g.generateCombinations(info.Fields)
 
-		checkField := strings.ToLower(f.Name)
+	for _, pf := range combinations {
 
-		if checkField == "id" || checkField == "gorm.model" || checkField == "createdat" || checkField == "updatedat" || checkField == "deletedat" {
-			continue
+		unique := true
+		skip := false
+
+		for _, f := range pf {
+			if skip {
+				continue
+			}
+
+			checkField := strings.ToLower(f.Name)
+			if checkField == "id" || checkField == "gorm.model" || checkField == "createdat" || checkField == "updatedat" || checkField == "deletedat" || checkField == "expiresat" {
+				skip = true
+			}
+
+			if f.Type == "struct" {
+				skip = true
+			}
+
+			if index := g.findTag(f.Tags, "index"); index {
+				skip = true
+			}
+
+			uTag := g.findTag(f.Tags, "unique")
+			if !uTag {
+				unique = false
+			}
 		}
 
-		if f.Type == "struct" {
-			continue
+		if !skip {
+			switch unique {
+			case true:
+				functions = append(functions, g.findOne(pf, info.StructModule, info.StructName))
+			case false:
+				functions = append(functions, g.findMany(pf, info.StructModule, info.StructName))
+			}
 		}
-
-		if index := g.findTag(f.Tags, "index"); index {
-			continue
-		}
-
-		unique := g.findTag(f.Tags, "unique")
-		if unique {
-			//	find one
-			function = g.findOne(f, info.StructModule, info.StructName)
-			functions = append(functions, function)
-		} else {
-			//find many
-			function = g.findMany(f, info.StructModule, info.StructName)
-			functions = append(functions, function)
-		}
-
 	}
 
 	return functions
@@ -235,64 +244,107 @@ func (g *Gorm) findTag(tags map[string][]string, tag string) bool {
 }
 
 // findBY func where field = ?
-func (g *Gorm) findOne(f parse.ParsedField, packageName, name string) filesys_core.FuncBody {
-
+func (g *Gorm) findOne(f []parse.ParsedField, packageName, name string) filesys_core.FuncBody {
 	var function filesys_core.FuncBody
 	entityName := packageName + "." + name
 	variableName := g.getVariableName(name)
 
-	if f.NestedStruct != nil {
-		if f.NestedStruct.PathToPackage != "" {
-			g.addImportFromField(f.NestedStruct.PathToPackage)
-		}
-	}
-
-	//if f.Type is not a standart type, then add import
-	if f.Type == "time.Time" {
-		g.addImportFromField("time")
-	}
-
-	function.Name = "FindBy" + f.Name
+	function.Name = "FindBy"
 	function.StructSymbol = "r"
 	function.StructName = name + g.suffix
-	function.Ars = append(function.Ars, f.Name+" "+f.Type)
+
+	for i, field := range f {
+		if field.Type == "time.Time" {
+			g.addImportFromField("time")
+		}
+		if field.NestedStruct != nil {
+			if field.NestedStruct.PathToPackage != "" {
+				g.addImportFromField(field.NestedStruct.PathToPackage)
+			}
+		}
+		if i == 0 {
+			function.Name += field.Name
+		} else {
+			function.Name += "And" + field.Name
+		}
+		function.Ars = append(function.Ars, field.Name+" "+field.Type)
+	}
+
 	function.ReturnValues = append(function.ReturnValues, "*"+entityName, "error")
 
-	//parse f.Name camel case to snake case
-	snakeCase := utils.ParseCamelCaseToSnakeCase(f.Name)
+	function.Body = "var " + variableName + " " + entityName + "\n\n" + "\tif err := r.db.Where(\""
+	for i, field := range f {
+		snakeCase := utils.ParseCamelCaseToSnakeCase(field.Name)
+		if i == 0 {
+			function.Body += snakeCase + " = ?"
+			continue
+		}
+		function.Body += " AND " + snakeCase + " = ?"
+	}
+	function.Body += "\", "
+	for i, field := range f {
+		if i == 0 {
+			function.Body += field.Name
+			continue
+		}
 
-	function.Body = "var " + variableName + " " + entityName + "\n\n" + "\tif err := r.db.Where(\"" + snakeCase + " = ?\", " + f.Name + ").First(&" + variableName + ").Error; err != nil {" + "\n" + "\t\t" + "return nil, err" + "\n" + "\t}" + "\n\n" + "\treturn &" + variableName + ", nil"
+		function.Body += " ," + field.Name
+	}
+
+	function.Body += ").First(&" + variableName + ").Error; err != nil {" + "\n" + "\t\t" + "return nil, err" + "\n" + "\t}" + "\n\n" + "\treturn &" + variableName + ", nil"
 
 	return function
 }
 
 // findMany func where field = ?
-func (g *Gorm) findMany(f parse.ParsedField, packageName, name string) filesys_core.FuncBody {
-
+func (g *Gorm) findMany(f []parse.ParsedField, packageName, name string) filesys_core.FuncBody {
 	var function filesys_core.FuncBody
 	entityName := packageName + "." + name
 	variableName := g.getVariableName(name)
-	if f.NestedStruct != nil {
-		if f.NestedStruct.PathToPackage != "" {
-			g.addImportFromField(f.NestedStruct.PathToPackage)
-		}
-	}
 
-	//if f.Type is not a standart type, then add import
-	if f.Type == "time.Time" {
-		g.addImportFromField("time")
-	}
-
-	function.Name = "FindBy" + f.Name
+	function.Name = "FindBy"
 	function.StructSymbol = "r"
-	function.StructName = name + string(g.suffix)
-	function.Ars = append(function.Ars, f.Name+" "+f.Type)
+	function.StructName = name + g.suffix
+
+	for i, field := range f {
+		if field.Type == "time.Time" {
+			g.addImportFromField("time")
+		}
+		if field.NestedStruct != nil {
+			if field.NestedStruct.PathToPackage != "" {
+				g.addImportFromField(field.NestedStruct.PathToPackage)
+			}
+		}
+		if i == 0 {
+			function.Name += field.Name
+		} else {
+			function.Name += "And" + field.Name
+		}
+		function.Ars = append(function.Ars, field.Name+" "+field.Type)
+	}
+
 	function.ReturnValues = append(function.ReturnValues, "[]*"+entityName, "error")
 
-	//parse f.Name camel case to snake case
-	snakeCase := utils.ParseCamelCaseToSnakeCase(f.Name)
+	function.Body = "var " + variableName + " []*" + entityName + "\n\n" + "\tif err := r.db.Where(\""
+	for i, field := range f {
+		snakeCase := utils.ParseCamelCaseToSnakeCase(field.Name)
+		if i == 0 {
+			function.Body += snakeCase + " = ?"
+			continue
+		}
+		function.Body += " AND " + snakeCase + " = ?"
+	}
+	function.Body += "\", "
+	for i, field := range f {
+		if i == 0 {
+			function.Body += field.Name
+			continue
+		}
 
-	function.Body = "var " + variableName + " []*" + entityName + "\n\n" + "\tif err := r.db.Where(\"" + snakeCase + " = ?\", " + f.Name + ").Find(&" + variableName + ").Error; err != nil {" + "\n" + "\t\t" + "return nil, err" + "\n" + "\t}" + "\n\n" + "\treturn " + variableName + ", nil"
+		function.Body += " ," + field.Name
+	}
+
+	function.Body += ").Find(&" + variableName + ").Error; err != nil {" + "\n" + "\t\t" + "return nil, err" + "\n" + "\t}" + "\n\n" + "\treturn " + variableName + ", nil"
 
 	return function
 }
@@ -362,27 +414,6 @@ func (g *Gorm) joinFunc(field parse.ParsedField, nestedStruct *parse.ParsedStruc
 	}
 
 	nestedField := g.generateCombinations(nestedStruct.Fields)
-
-	//newNestedField := make([][]parse.ParsedField, 0) // for holding the new modified slice
-	//
-	//for _, f := range nestedField {
-	//	newF := make([]parse.ParsedField, 0) // for holding the new inner slice
-	//
-	//	for _, nf := range f {
-	//		if nf.Type != string(constants.StructType) {
-	//			newF = append(newF, nf)
-	//		}
-	//	}
-	//
-	//	// If nf.Type equals constants.StructType for all nf in f, newF will be empty.
-	//	// If you wish to preserve f even when empty, delete the next 'if len(newF) > 0'.
-	//	if len(newF) > 0 {
-	//		newNestedField = append(newNestedField, newF)
-	//	}
-	//}
-	//
-	//// assign the new (modified) slice back to nestedField
-	//nestedField = newNestedField
 
 	for _, f := range nestedField {
 		var function filesys_core.FuncBody
