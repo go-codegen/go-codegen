@@ -17,7 +17,7 @@ type Gorm struct {
 
 func NewGorm() *Gorm {
 	return &Gorm{
-		suffix:       string(constants.Suffix),
+		suffix:       string(constants.Suffix) + "Impl",
 		structSymbol: string(constants.StructSymbol),
 	}
 }
@@ -27,18 +27,16 @@ func (g *Gorm) MethodsData(info parse.ParsedStruct) repository.Methods {
 
 	g.addImportFromField("gorm.io/gorm")
 	g.addImportFromField(info.PathToPackage)
-	methods.Struct = g.createRepositoryStruct(info.StructName + string(g.suffix))
+	methods.Struct = g.createRepositoryStruct(info.StructName + g.suffix)
 
 	methods.Funcs = append(methods.Funcs, g.createFuncNewRepositoryStruct(info.StructName))
 	methods.Funcs = append(methods.Funcs, g.create(info))
 	methods.Funcs = append(methods.Funcs, g.find(info))
-	methods.Funcs = append(methods.Funcs, g.findByAllFieldsJoin(info)...)
-
 	findFuncs := g.findByAllFields(info)
-
 	for _, f := range findFuncs {
 		methods.Funcs = append(methods.Funcs, f)
 	}
+	methods.Funcs = append(methods.Funcs, g.findByAllFieldsJoin(info)...)
 
 	methods.Funcs = append(methods.Funcs, g.update(info))
 	methods.Funcs = append(methods.Funcs, g.delete(info))
@@ -46,7 +44,12 @@ func (g *Gorm) MethodsData(info parse.ParsedStruct) repository.Methods {
 	methods.Imports = g.imports
 
 	for _, f := range methods.Funcs {
-		methods.Interface.Name = info.StructName + g.suffix + "Impl"
+		if f.Name == "New"+info.StructName+g.suffix {
+			continue
+		}
+
+		newSuffix := strings.ReplaceAll(g.suffix, "Impl", "")
+		methods.Interface.Name = info.StructName + newSuffix
 
 		args := strings.Join(f.Ars, ", ")
 		returnValues := strings.Join(f.ReturnValues, ", ")
@@ -180,34 +183,45 @@ func (g *Gorm) find(info parse.ParsedStruct) filesys_core.FuncBody {
 func (g *Gorm) findByAllFields(info parse.ParsedStruct) []filesys_core.FuncBody {
 	var functions []filesys_core.FuncBody
 
-	for _, f := range info.Fields {
-		var function filesys_core.FuncBody
+	combinations := g.generateCombinations(info.Fields)
 
-		checkField := strings.ToLower(f.Name)
+	for _, pf := range combinations {
 
-		if checkField == "id" || checkField == "gorm.model" || checkField == "createdat" || checkField == "updatedat" || checkField == "deletedat" {
-			continue
+		unique := true
+		skip := false
+
+		for _, f := range pf {
+			if skip {
+				continue
+			}
+
+			checkField := strings.ToLower(f.Name)
+			if checkField == "id" || checkField == "gorm.model" || checkField == "createdat" || checkField == "updatedat" || checkField == "deletedat" || checkField == "expiresat" {
+				skip = true
+			}
+
+			if f.Type == "struct" {
+				skip = true
+			}
+
+			if index := g.findTag(f.Tags, "index"); index {
+				skip = true
+			}
+
+			uTag := g.findTag(f.Tags, "unique")
+			if !uTag {
+				unique = false
+			}
 		}
 
-		if f.Type == "struct" {
-			continue
+		if !skip {
+			switch unique {
+			case true:
+				functions = append(functions, g.findOne(pf, info.StructModule, info.StructName))
+			case false:
+				functions = append(functions, g.findMany(pf, info.StructModule, info.StructName))
+			}
 		}
-
-		if index := g.findTag(f.Tags, "index"); index {
-			continue
-		}
-
-		unique := g.findTag(f.Tags, "unique")
-		if unique {
-			//	find one
-			function = g.findOne(f, info.StructModule, info.StructName)
-			functions = append(functions, function)
-		} else {
-			//find many
-			function = g.findMany(f, info.StructModule, info.StructName)
-			functions = append(functions, function)
-		}
-
 	}
 
 	return functions
@@ -230,49 +244,107 @@ func (g *Gorm) findTag(tags map[string][]string, tag string) bool {
 }
 
 // findBY func where field = ?
-func (g *Gorm) findOne(f parse.ParsedField, packageName, name string) filesys_core.FuncBody {
-
+func (g *Gorm) findOne(f []parse.ParsedField, packageName, name string) filesys_core.FuncBody {
 	var function filesys_core.FuncBody
 	entityName := packageName + "." + name
 	variableName := g.getVariableName(name)
 
-	if f.NestedStruct != nil {
-		g.addImportFromField(f.NestedStruct.PathToPackage)
-	}
-
-	function.Name = "FindBy" + f.Name
+	function.Name = "FindBy"
 	function.StructSymbol = "r"
 	function.StructName = name + g.suffix
-	function.Ars = append(function.Ars, f.Name+" "+f.Type)
+
+	for i, field := range f {
+		if field.Type == "time.Time" {
+			g.addImportFromField("time")
+		}
+		if field.NestedStruct != nil {
+			if field.NestedStruct.PathToPackage != "" {
+				g.addImportFromField(field.NestedStruct.PathToPackage)
+			}
+		}
+		if i == 0 {
+			function.Name += field.Name
+		} else {
+			function.Name += "And" + field.Name
+		}
+		function.Ars = append(function.Ars, field.Name+" "+field.Type)
+	}
+
 	function.ReturnValues = append(function.ReturnValues, "*"+entityName, "error")
 
-	//parse f.Name camel case to snake case
-	snakeCase := utils.ParseCamelCaseToSnakeCase(f.Name)
+	function.Body = "var " + variableName + " " + entityName + "\n\n" + "\tif err := r.db.Where(\""
+	for i, field := range f {
+		snakeCase := utils.ParseCamelCaseToSnakeCase(field.Name)
+		if i == 0 {
+			function.Body += snakeCase + " = ?"
+			continue
+		}
+		function.Body += " AND " + snakeCase + " = ?"
+	}
+	function.Body += "\", "
+	for i, field := range f {
+		if i == 0 {
+			function.Body += field.Name
+			continue
+		}
 
-	function.Body = "var " + variableName + " " + entityName + "\n\n" + "\tif err := r.db.Where(\"" + snakeCase + " = ?\", " + f.Name + ").First(&" + variableName + ").Error; err != nil {" + "\n" + "\t\t" + "return nil, err" + "\n" + "\t}" + "\n\n" + "\treturn &" + variableName + ", nil"
+		function.Body += " ," + field.Name
+	}
+
+	function.Body += ").First(&" + variableName + ").Error; err != nil {" + "\n" + "\t\t" + "return nil, err" + "\n" + "\t}" + "\n\n" + "\treturn &" + variableName + ", nil"
 
 	return function
 }
 
 // findMany func where field = ?
-func (g *Gorm) findMany(f parse.ParsedField, packageName, name string) filesys_core.FuncBody {
-
+func (g *Gorm) findMany(f []parse.ParsedField, packageName, name string) filesys_core.FuncBody {
 	var function filesys_core.FuncBody
 	entityName := packageName + "." + name
 	variableName := g.getVariableName(name)
-	if f.NestedStruct != nil {
-		g.addImportFromField(f.NestedStruct.PathToPackage)
-	}
-	function.Name = "FindBy" + f.Name
+
+	function.Name = "FindBy"
 	function.StructSymbol = "r"
-	function.StructName = name + string(g.suffix)
-	function.Ars = append(function.Ars, f.Name+" "+f.Type)
+	function.StructName = name + g.suffix
+
+	for i, field := range f {
+		if field.Type == "time.Time" {
+			g.addImportFromField("time")
+		}
+		if field.NestedStruct != nil {
+			if field.NestedStruct.PathToPackage != "" {
+				g.addImportFromField(field.NestedStruct.PathToPackage)
+			}
+		}
+		if i == 0 {
+			function.Name += field.Name
+		} else {
+			function.Name += "And" + field.Name
+		}
+		function.Ars = append(function.Ars, field.Name+" "+field.Type)
+	}
+
 	function.ReturnValues = append(function.ReturnValues, "[]*"+entityName, "error")
 
-	//parse f.Name camel case to snake case
-	snakeCase := utils.ParseCamelCaseToSnakeCase(f.Name)
+	function.Body = "var " + variableName + " []*" + entityName + "\n\n" + "\tif err := r.db.Where(\""
+	for i, field := range f {
+		snakeCase := utils.ParseCamelCaseToSnakeCase(field.Name)
+		if i == 0 {
+			function.Body += snakeCase + " = ?"
+			continue
+		}
+		function.Body += " AND " + snakeCase + " = ?"
+	}
+	function.Body += "\", "
+	for i, field := range f {
+		if i == 0 {
+			function.Body += field.Name
+			continue
+		}
 
-	function.Body = "var " + variableName + " []*" + entityName + "\n\n" + "\tif err := r.db.Where(\"" + snakeCase + " = ?\", " + f.Name + ").Find(&" + variableName + ").Error; err != nil {" + "\n" + "\t\t" + "return nil, err" + "\n" + "\t}" + "\n\n" + "\treturn " + variableName + ", nil"
+		function.Body += " ," + field.Name
+	}
+
+	function.Body += ").Find(&" + variableName + ").Error; err != nil {" + "\n" + "\t\t" + "return nil, err" + "\n" + "\t}" + "\n\n" + "\treturn " + variableName + ", nil"
 
 	return function
 }
@@ -284,14 +356,12 @@ func (g *Gorm) findByAllFieldsJoin(info parse.ParsedStruct) []filesys_core.FuncB
 	for _, f := range info.Fields {
 
 		checkField := strings.ToLower(f.Name)
-
 		if checkField == "id" || checkField == "gorm.model" || checkField == "createdat" || checkField == "updatedat" || checkField == "deletedat" {
 			continue
 		}
 		if f.Type != string(constants.StructType) {
 			continue
 		}
-		//fmt.Println(f)
 		findNestedField := g.findPrefixNameField(info.Fields, f.Name)
 		functions = append(functions, g.createJoinFunc(f, findNestedField, info.StructModule, info.StructName)...)
 	}
@@ -407,6 +477,7 @@ func (g *Gorm) generateCombinations(arr []parse.ParsedField) [][]parse.ParsedFie
 
 	n := len(arr)
 	for i := 1; i <= n; i++ {
+
 		g.generateCombination(arr, &combinations, []parse.ParsedField{}, 0, n, i)
 	}
 
@@ -420,7 +491,12 @@ func (g *Gorm) generateCombination(arr []parse.ParsedField, combinations *[][]pa
 	}
 
 	for i := start; i < end; i++ {
+		if arr[i].Type == string(constants.StructType) {
+			//	skip nested struct
+			continue
+		}
 		current = append(current, arr[i])
+
 		g.generateCombination(arr, combinations, current, i+1, end, size-1)
 		current = current[:len(current)-1]
 	}
