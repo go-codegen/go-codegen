@@ -11,6 +11,7 @@ type RepositoryTestRepositoryImpl struct {
 
 type RepositoryTestRepository interface {
 	Create(r1 *test.RepositoryTest) (*test.RepositoryTest, error)
+	CreateByArr(r1 []*test.RepositoryTest) ([]*test.RepositoryTest, error)
 	FindByID(id string) (*test.RepositoryTest, error)
 	FindByAccessToken(AccessToken string) (*test.RepositoryTest, error)
 	DeleteByAccessToken(AccessToken string) (*test.RepositoryTest, error)
@@ -38,6 +39,7 @@ type RepositoryTestRepository interface {
 	FindByUserEmailAndPassword(Email string, Password string) ([]*test.RepositoryTest, error)
 	FindByUserNameAndEmailAndPassword(Name string, Email string, Password string) ([]*test.RepositoryTest, error)
 	Update(r1 *test.RepositoryTest) (*test.RepositoryTest, error)
+	DeleteByArrID(id []string) error
 	Delete(id string) error
 }
 
@@ -49,6 +51,14 @@ func NewRepositoryTestRepositoryImpl(db *gorm.DB) *RepositoryTestRepositoryImpl 
 
 func (r *RepositoryTestRepositoryImpl) Create(r1 *test.RepositoryTest) (*test.RepositoryTest, error) {
 	if err := r.db.Create(&r1).Error; err != nil {
+		return nil, err
+	}
+
+	return r1, nil
+}
+
+func (r *RepositoryTestRepositoryImpl) CreateByArr(r1 []*test.RepositoryTest) ([]*test.RepositoryTest, error) {
+	if err := r.db.Create(r1).Error; err != nil {
 		return nil, err
 	}
 
@@ -349,6 +359,14 @@ func (r *RepositoryTestRepositoryImpl) Update(r1 *test.RepositoryTest) (*test.Re
 	}
 
 	return r1, nil
+}
+
+func (r *RepositoryTestRepositoryImpl) DeleteByArrID(id []string) error {
+	if err := r.db.Delete([]test.RepositoryTest{}, id).Error; err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r *RepositoryTestRepositoryImpl) Delete(id string) error {

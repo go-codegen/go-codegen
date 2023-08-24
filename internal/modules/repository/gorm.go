@@ -31,7 +31,8 @@ func (g *Gorm) MethodsData(info parse.ParsedStruct) repository.Methods {
 
 	methods.Funcs = append(methods.Funcs, g.createFuncNewRepositoryStruct(info.StructName))
 	methods.Funcs = append(methods.Funcs, g.create(info))
-	methods.Funcs = append(methods.Funcs, g.find(info))
+	methods.Funcs = append(methods.Funcs, g.createMass(info))
+	methods.Funcs = append(methods.Funcs, g.findByID(info))
 	findFuncs := g.findByAllFields(info)
 	for _, f := range findFuncs {
 		methods.Funcs = append(methods.Funcs, f)
@@ -39,7 +40,8 @@ func (g *Gorm) MethodsData(info parse.ParsedStruct) repository.Methods {
 	methods.Funcs = append(methods.Funcs, g.findByAllFieldsJoin(info)...)
 
 	methods.Funcs = append(methods.Funcs, g.update(info))
-	methods.Funcs = append(methods.Funcs, g.delete(info))
+	methods.Funcs = append(methods.Funcs, g.massDeleteByID(info))
+	methods.Funcs = append(methods.Funcs, g.deleteByID(info))
 
 	methods.Imports = g.imports
 
@@ -99,12 +101,29 @@ func (g *Gorm) create(info parse.ParsedStruct) filesys_core.FuncBody {
 
 	function.Name = "Create"
 	function.StructSymbol = g.structSymbol
-	function.StructName = info.StructName + string(g.suffix)
+	function.StructName = info.StructName + g.suffix
 
 	function.Ars = append(function.Ars, variableName+" *"+entityName)
 	function.ReturnValues = append(function.ReturnValues, "*"+entityName, "error")
 
 	function.Body = "if err := r.db.Create(&" + variableName + ").Error; err != nil {" + "\n" + "\t\t" + "return nil, err" + "\n" + "\t}" + "\n\n" + "\treturn " + variableName + ", nil"
+	return function
+}
+
+func (g *Gorm) createMass(info parse.ParsedStruct) filesys_core.FuncBody {
+	var function filesys_core.FuncBody
+
+	entityName := info.StructModule + "." + info.StructName
+	variableName := g.getVariableName(info.StructName)
+
+	function.Name = "CreateByArr"
+	function.StructSymbol = g.structSymbol
+	function.StructName = info.StructName + g.suffix
+
+	function.Ars = append(function.Ars, variableName+" []*"+entityName)
+	function.ReturnValues = append(function.ReturnValues, "[]*"+entityName, "error")
+	function.Body = "if err := r.db.Create(" + variableName + ").Error; err != nil {" + "\n" + "\t\t" + "return nil, err" + "\n" + "\t}" + "\n\n" + "\treturn " + variableName + ", nil"
+
 	return function
 }
 
@@ -128,8 +147,8 @@ func (g *Gorm) createRepositoryStruct(name string) filesys_core.StructBody {
 	return entity
 }
 
-// delete func
-func (g *Gorm) delete(info parse.ParsedStruct) filesys_core.FuncBody {
+// deleteByID func
+func (g *Gorm) deleteByID(info parse.ParsedStruct) filesys_core.FuncBody {
 	var function filesys_core.FuncBody
 	function.Name = "Delete"
 
@@ -144,7 +163,22 @@ func (g *Gorm) delete(info parse.ParsedStruct) filesys_core.FuncBody {
 	return function
 }
 
-// findBY func where field = ?
+// deleteByID func
+func (g *Gorm) massDeleteByID(info parse.ParsedStruct) filesys_core.FuncBody {
+	var function filesys_core.FuncBody
+	function.Name = "DeleteByArrID"
+
+	entityName := info.StructModule + "." + info.StructName
+
+	function.StructSymbol = g.structSymbol
+	function.StructName = info.StructName + g.suffix
+	function.Ars = append(function.Ars, "id []string")
+	function.ReturnValues = append(function.ReturnValues, "error")
+
+	function.Body = "if err := r.db.Delete([]" + entityName + "{}, id).Error; err != nil {" + "\n" + "\t\t" + "return err" + "\n" + "\t}" + "\n\n" + "\treturn nil"
+	return function
+}
+
 func (g *Gorm) deleteByManyFields(f []parse.ParsedField, packageName, name string) filesys_core.FuncBody {
 	var function filesys_core.FuncBody
 	entityName := packageName + "." + name
@@ -215,7 +249,7 @@ func (g *Gorm) update(info parse.ParsedStruct) filesys_core.FuncBody {
 }
 
 // findById func where id = ?
-func (g *Gorm) find(info parse.ParsedStruct) filesys_core.FuncBody {
+func (g *Gorm) findByID(info parse.ParsedStruct) filesys_core.FuncBody {
 	var function filesys_core.FuncBody
 
 	function.Name = "FindByID"
