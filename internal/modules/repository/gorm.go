@@ -140,7 +140,60 @@ func (g *Gorm) delete(info parse.ParsedStruct) filesys_core.FuncBody {
 	function.Ars = append(function.Ars, "id string")
 	function.ReturnValues = append(function.ReturnValues, "error")
 
-	function.Body = "if err := r.db.Delete(&" + entityName + "{},\"id = ?\", id).Error; err != nil {" + "\n" + "\t\t" + "return err" + "\n" + "\t}" + "\n\n" + "\treturn nil"
+	function.Body = "if err := r.db.Delete(&" + entityName + "{}, id).Error; err != nil {" + "\n" + "\t\t" + "return err" + "\n" + "\t}" + "\n\n" + "\treturn nil"
+	return function
+}
+
+// findBY func where field = ?
+func (g *Gorm) deleteByManyFields(f []parse.ParsedField, packageName, name string) filesys_core.FuncBody {
+	var function filesys_core.FuncBody
+	entityName := packageName + "." + name
+	variableName := g.getVariableName(name)
+
+	function.Name = "DeleteBy"
+	function.StructSymbol = "r"
+	function.StructName = name + g.suffix
+
+	for i, field := range f {
+		if field.Type == "time.Time" {
+			g.addImportFromField("time")
+		}
+		if field.NestedStruct != nil {
+			if field.NestedStruct.PathToPackage != "" {
+				g.addImportFromField(field.NestedStruct.PathToPackage)
+			}
+		}
+		if i == 0 {
+			function.Name += field.Name
+		} else {
+			function.Name += "And" + field.Name
+		}
+		function.Ars = append(function.Ars, field.Name+" "+field.Type)
+	}
+
+	function.ReturnValues = append(function.ReturnValues, "*"+entityName, "error")
+
+	function.Body = "var " + variableName + " " + entityName + "\n\n" + "\tif err := r.db.Where(\""
+	for i, field := range f {
+		snakeCase := utils.ParseCamelCaseToSnakeCase(field.Name)
+		if i == 0 {
+			function.Body += snakeCase + " = ?"
+			continue
+		}
+		function.Body += " AND " + snakeCase + " = ?"
+	}
+	function.Body += "\", "
+	for i, field := range f {
+		if i == 0 {
+			function.Body += field.Name
+			continue
+		}
+
+		function.Body += " ," + field.Name
+	}
+
+	function.Body += ").Delete(&" + variableName + ").Error; err != nil {" + "\n" + "\t\t" + "return nil, err" + "\n" + "\t}" + "\n\n" + "\treturn &" + variableName + ", nil"
+
 	return function
 }
 
@@ -218,6 +271,7 @@ func (g *Gorm) findByAllFields(info parse.ParsedStruct) []filesys_core.FuncBody 
 			switch unique {
 			case true:
 				functions = append(functions, g.findOne(pf, info.StructModule, info.StructName))
+				functions = append(functions, g.deleteByManyFields(pf, info.StructModule, info.StructName))
 			case false:
 				functions = append(functions, g.findMany(pf, info.StructModule, info.StructName))
 			}
