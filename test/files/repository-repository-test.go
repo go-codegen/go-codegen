@@ -362,7 +362,7 @@ func (r *RepositoryTestRepositoryImpl) Update(r1 *test.RepositoryTest) (*test.Re
 }
 
 func (r *RepositoryTestRepositoryImpl) DeleteByArrID(id []string) error {
-	if err := r.db.Delete(&test.RepositoryTest{}, id).Error; err != nil {
+	if err := r.db.Delete([]test.RepositoryTest{}, id).Error; err != nil {
 		return err
 	}
 

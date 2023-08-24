@@ -175,7 +175,7 @@ func (g *Gorm) massDeleteByID(info parse.ParsedStruct) filesys_core.FuncBody {
 	function.Ars = append(function.Ars, "id []string")
 	function.ReturnValues = append(function.ReturnValues, "error")
 
-	function.Body = "if err := r.db.Delete(&" + entityName + "{}, id).Error; err != nil {" + "\n" + "\t\t" + "return err" + "\n" + "\t}" + "\n\n" + "\treturn nil"
+	function.Body = "if err := r.db.Delete([]" + entityName + "{}, id).Error; err != nil {" + "\n" + "\t\t" + "return err" + "\n" + "\t}" + "\n\n" + "\treturn nil"
 	return function
 }
 
