@@ -13,10 +13,13 @@ type RepositoryTestRepository interface {
 	Create(r1 *test.RepositoryTest) (*test.RepositoryTest, error)
 	FindByID(id string) (*test.RepositoryTest, error)
 	FindByAccessToken(AccessToken string) (*test.RepositoryTest, error)
+	DeleteByAccessToken(AccessToken string) (*test.RepositoryTest, error)
 	FindByRefreshToken(RefreshToken string) (*test.RepositoryTest, error)
+	DeleteByRefreshToken(RefreshToken string) (*test.RepositoryTest, error)
 	FindByUserID(UserID int) ([]*test.RepositoryTest, error)
 	FindByIP(IP string) ([]*test.RepositoryTest, error)
 	FindByAccessTokenAndRefreshToken(AccessToken string, RefreshToken string) (*test.RepositoryTest, error)
+	DeleteByAccessTokenAndRefreshToken(AccessToken string, RefreshToken string) (*test.RepositoryTest, error)
 	FindByAccessTokenAndUserID(AccessToken string, UserID int) ([]*test.RepositoryTest, error)
 	FindByAccessTokenAndIP(AccessToken string, IP string) ([]*test.RepositoryTest, error)
 	FindByRefreshTokenAndUserID(RefreshToken string, UserID int) ([]*test.RepositoryTest, error)
@@ -72,10 +75,30 @@ func (r *RepositoryTestRepositoryImpl) FindByAccessToken(AccessToken string) (*t
 	return &r1, nil
 }
 
+func (r *RepositoryTestRepositoryImpl) DeleteByAccessToken(AccessToken string) (*test.RepositoryTest, error) {
+	var r1 test.RepositoryTest
+
+	if err := r.db.Where("access_token = ?", AccessToken).Delete(&r1).Error; err != nil {
+		return nil, err
+	}
+
+	return &r1, nil
+}
+
 func (r *RepositoryTestRepositoryImpl) FindByRefreshToken(RefreshToken string) (*test.RepositoryTest, error) {
 	var r1 test.RepositoryTest
 
 	if err := r.db.Where("refresh_token = ?", RefreshToken).First(&r1).Error; err != nil {
+		return nil, err
+	}
+
+	return &r1, nil
+}
+
+func (r *RepositoryTestRepositoryImpl) DeleteByRefreshToken(RefreshToken string) (*test.RepositoryTest, error) {
+	var r1 test.RepositoryTest
+
+	if err := r.db.Where("refresh_token = ?", RefreshToken).Delete(&r1).Error; err != nil {
 		return nil, err
 	}
 
@@ -106,6 +129,16 @@ func (r *RepositoryTestRepositoryImpl) FindByAccessTokenAndRefreshToken(AccessTo
 	var r1 test.RepositoryTest
 
 	if err := r.db.Where("access_token = ? AND refresh_token = ?", AccessToken, RefreshToken).First(&r1).Error; err != nil {
+		return nil, err
+	}
+
+	return &r1, nil
+}
+
+func (r *RepositoryTestRepositoryImpl) DeleteByAccessTokenAndRefreshToken(AccessToken string, RefreshToken string) (*test.RepositoryTest, error) {
+	var r1 test.RepositoryTest
+
+	if err := r.db.Where("access_token = ? AND refresh_token = ?", AccessToken, RefreshToken).Delete(&r1).Error; err != nil {
 		return nil, err
 	}
 
@@ -319,7 +352,7 @@ func (r *RepositoryTestRepositoryImpl) Update(r1 *test.RepositoryTest) (*test.Re
 }
 
 func (r *RepositoryTestRepositoryImpl) Delete(id string) error {
-	if err := r.db.Delete(&test.RepositoryTest{}, "id = ?", id).Error; err != nil {
+	if err := r.db.Delete(&test.RepositoryTest{}, id).Error; err != nil {
 		return err
 	}
 
